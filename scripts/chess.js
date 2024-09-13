@@ -1,8 +1,7 @@
-const boardElement = document.getElementById('chessBoard');
-const statusElement = document.getElementById('chessStatus');
-const restartBtn = document.getElementById('chessRestart');
-
+// Initialize Chess.js game instance
 const game = new Chess();
+
+// Initialize Chessboard.js board
 const board = Chessboard('chessBoard', {
     draggable: true,
     position: 'start',
@@ -11,54 +10,82 @@ const board = Chessboard('chessBoard', {
     onSnapEnd: onSnapEnd
 });
 
+// Elements
+const statusElement = document.getElementById('chessStatus');
+const restartBtn = document.getElementById('chessRestart');
+
+// Update the game status text
+function updateStatus() {
+    let status = '';
+
+    let moveColor = 'White';
+    if (game.turn() === 'b') {
+        moveColor = 'Black';
+    }
+
+    // Checkmate?
+    if (game.in_checkmate()) {
+        status = `Game over, ${moveColor} is in checkmate.`;
+    }
+    // Draw?
+    else if (game.in_draw()) {
+        status = 'Game over, drawn position.';
+    }
+    // Game still on
+    else {
+        status = `${moveColor}'s turn to move.`;
+
+        // Check?
+        if (game.in_check()) {
+            status += ` ${moveColor} is in check.`;
+        }
+    }
+
+    statusElement.textContent = status;
+}
+
+// When a piece is picked up
 function onDragStart(source, piece, position, orientation) {
+    // Do not pick up pieces if the game is over
     if (game.game_over()) return false;
-    if (
-        (game.turn() === 'w' && piece.search(/^b/) !== -1) ||
-        (game.turn() === 'b' && piece.search(/^w/) !== -1)
-    ) {
+
+    // Only pick up pieces that belong to the current player
+    if ((game.turn() === 'w' && piece.search(/^b/) !== -1) ||
+        (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
         return false;
     }
 }
 
+// When a piece is dropped
 function onDrop(source, target) {
+    // See if the move is legal
     const move = game.move({
         from: source,
         to: target,
-        promotion: 'q'
+        promotion: 'q' // Automatically promote to a queen for simplicity
     });
 
+    // Illegal move
     if (move === null) return 'snapback';
+
+    // Update the status
     updateStatus();
 }
 
+// Update the board position after the piece snap
 function onSnapEnd() {
     board.position(game.fen());
 }
 
-function updateStatus() {
-    let status = '';
-
-    let moveColor = game.turn() === 'b' ? 'Black' : 'White';
-
-    if (game.in_checkmate()) {
-        status = `Game over, ${moveColor} is in checkmate.`;
-    } else if (game.in_draw()) {
-        status = 'Game over, drawn position.';
-    } else {
-        status = `${moveColor}'s turn`;
-        if (game.in_check()) {
-            status += `, ${moveColor} is in check`;
-        }
-    }
-    statusElement.textContent = status;
-}
-
+// Restart the game
 function restartGame() {
     game.reset();
     board.start();
     updateStatus();
 }
 
+// Event listener for the restart button
 restartBtn.addEventListener('click', restartGame);
+
+// Initial status update
 updateStatus();
