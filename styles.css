@@ -1,0 +1,33 @@
+body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+}
+
+h1 {
+    margin-top: 20px;
+}
+
+#game, canvas {
+    margin: 0 auto;
+}
+
+.cell {
+    width: 60px;
+    height: 60px;
+    border: 1px solid #000;
+    display: inline-block;
+    font-size: 48px;
+    line-height: 60px;
+    text-align: center;
+    cursor: pointer;
+}
+
+.row {
+    height: 60px;
+}
+
+button {
+    margin-top: 20px;
+    padding: 10px 20px;
+    font-size: 16px;
+}
