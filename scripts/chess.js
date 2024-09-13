@@ -1,31 +1,31 @@
 // Initialize Chess.js game instance
-const game = new Chess();
+var game = new Chess();
 
 // Initialize Chessboard.js board
-const board = Chessboard('chessBoard', {
+var board = Chessboard('chessBoard', {
     draggable: true,
     position: 'start',
     onDragStart: onDragStart,
     onDrop: onDrop,
-    onSnapEnd: onSnapEnd
+    onSnapEnd: onSnapEnd,
 });
 
 // Elements
-const statusElement = document.getElementById('chessStatus');
-const restartBtn = document.getElementById('chessRestart');
+var statusElement = document.getElementById('chessStatus');
+var restartBtn = document.getElementById('chessRestart');
 
 // Update the game status text
 function updateStatus() {
-    let status = '';
+    var status = '';
 
-    let moveColor = 'White';
+    var moveColor = 'White';
     if (game.turn() === 'b') {
         moveColor = 'Black';
     }
 
     // Checkmate?
     if (game.in_checkmate()) {
-        status = `Game over, ${moveColor} is in checkmate.`;
+        status = 'Game over, ' + moveColor + ' is in checkmate.';
     }
     // Draw?
     else if (game.in_draw()) {
@@ -33,11 +33,11 @@ function updateStatus() {
     }
     // Game still on
     else {
-        status = `${moveColor}'s turn to move.`;
+        status = moveColor + "'s turn to move";
 
         // Check?
         if (game.in_check()) {
-            status += ` ${moveColor} is in check.`;
+            status += ', ' + moveColor + ' is in check.';
         }
     }
 
@@ -59,16 +59,15 @@ function onDragStart(source, piece, position, orientation) {
 // When a piece is dropped
 function onDrop(source, target) {
     // See if the move is legal
-    const move = game.move({
+    var move = game.move({
         from: source,
         to: target,
-        promotion: 'q' // Automatically promote to a queen for simplicity
+        promotion: 'q' // Promote to a queen for simplicity
     });
 
     // Illegal move
     if (move === null) return 'snapback';
 
-    // Update the status
     updateStatus();
 }
 
