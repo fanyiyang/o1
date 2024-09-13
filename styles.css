@@ -31,3 +31,28 @@ button {
     padding: 10px 20px;
     font-size: 16px;
 }
+
+
+body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+}
+
+h1 {
+    margin-top: 20px;
+}
+
+#chessBoard {
+    margin: 20px auto;
+}
+
+#chessStatus {
+    font-size: 18px;
+    margin-top: 10px;
+}
+
+button {
+    margin-top: 20px;
+    padding: 10px 20px;
+    font-size: 16px;
+}
