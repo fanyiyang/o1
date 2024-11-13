@@ -4,19 +4,20 @@
     <meta charset="UTF-8">
     <title>Chess</title>
     <!-- Include Chessboard.js CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
-    <!-- Include custom styles -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard.js/0.3.0/css/chessboard-0.3.0.min.css" integrity="sha512-2pEKnfSSRL0PnCBYl7SXlRlf2x15kvmKzp5mxuOfKcY5an4FzpjKkQTEW5UIMHQQpCyL98nFESg0HiC1x6KnRw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <!-- Include custom styles if any -->
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <h1>Chess</h1>
-    <div id="chessBoard" style="width: 400px; margin: 0 auto;"></div>
-    <p id="chessStatus"></p>
-    <button id="chessRestart">Restart Game</button>
+    <div id="board" style="width: 400px; margin: 0 auto;"></div>
+    <p id="status"></p>
+    <button id="restartBtn">Restart Game</button>
 
     <!-- Include chess.js and chessboard.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chess.js@0.12.0/chess.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.2/chess.min.js" integrity="sha512-C3S4KW3yXvk8CCxYceq07P+Kn8CiLrAhO6UP4YJWnUcZPr5L0U3SCN0C6W0GR41V0nFkG58tg7IZ+Yu1qx+6jg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard.js/0.3.0/js/chessboard-0.3.0.min.js" integrity="sha512-RJOPNsyA0kRwxjQU2ULeECKJFFyVQoygEJ5ECU29MbGx0Sx7eChiv4IN+/6eEABxFnZURiIZYZTCrD06a4ksdQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <!-- Include your custom JavaScript file -->
     <script src="scripts/chess.js"></script>
 </body>
 </html>
