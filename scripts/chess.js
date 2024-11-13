@@ -1,8 +1,8 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize Chess.js game instance
+    // 初始化Chess.js游戏实例
     var game = new Chess();
 
-    // Initialize Chessboard.js board
+    // 初始化ChessBoard.js棋盘
     var board = ChessBoard('chessBoard', {
         draggable: true,
         position: 'start',
@@ -11,32 +11,30 @@ document.addEventListener('DOMContentLoaded', function() {
         onSnapEnd: onSnapEnd,
     });
 
-    // Elements
+    // 元素
     var statusElement = document.getElementById('chessStatus');
     var restartBtn = document.getElementById('chessRestart');
 
-    // Update the game status text
+    // 更新游戏状态文本
     function updateStatus() {
         var status = '';
-
         var moveColor = 'White';
         if (game.turn() === 'b') {
             moveColor = 'Black';
         }
 
-        // Checkmate?
+        // 判断是否为将死状态
         if (game.in_checkmate()) {
             status = 'Game over, ' + moveColor + ' is in checkmate.';
         }
-        // Draw?
+        // 判断是否为平局
         else if (game.in_draw()) {
             status = 'Game over, drawn position.';
         }
-        // Game still on
+        // 游戏进行中
         else {
             status = moveColor + "'s turn to move";
-
-            // Check?
+            // 判断是否被将军
             if (game.in_check()) {
                 status += ', ' + moveColor + ' is in check.';
             }
@@ -45,48 +43,48 @@ document.addEventListener('DOMContentLoaded', function() {
         statusElement.textContent = status;
     }
 
-    // When a piece is picked up
+    // 当棋子被拿起
     function onDragStart(source, piece, position, orientation) {
-        // Do not pick up pieces if the game is over
+        // 如果游戏结束，不允许拿起棋子
         if (game.game_over()) return false;
 
-        // Only pick up pieces that belong to the current player
+        // 只允许当前玩家的棋子
         if ((game.turn() === 'w' && piece.search(/^b/) !== -1) ||
             (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
             return false;
         }
     }
 
-    // When a piece is dropped
+    // 当棋子被放下
     function onDrop(source, target) {
-        // See if the move is legal
+        // 检查是否为合法移动
         var move = game.move({
             from: source,
             to: target,
-            promotion: 'q' // Promote to a queen for simplicity
+            promotion: 'q' // 简化为升变为皇后
         });
 
-        // Illegal move
+        // 如果是非法移动，则返回原位
         if (move === null) return 'snapback';
 
         updateStatus();
     }
 
-    // Update the board position after the piece snap
+    // 在棋子放下后更新棋盘位置
     function onSnapEnd() {
         board.position(game.fen());
     }
 
-    // Restart the game
+    // 重新开始游戏
     function restartGame() {
         game.reset();
         board.start();
         updateStatus();
     }
 
-    // Event listener for the restart button
+    // 为重新开始按钮添加事件监听器
     restartBtn.addEventListener('click', restartGame);
 
-    // Initial status update
+    // 初始状态更新
     updateStatus();
 });
