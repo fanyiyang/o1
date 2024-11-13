@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var game = new Chess();
 
     // Initialize Chessboard.js board
-    var board = ChessBoard('board', {
+    var board = ChessBoard('chessBoard', {
         draggable: true,
         position: 'start',
         onDragStart: onDragStart,
@@ -12,8 +12,8 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Elements
-    var statusElement = document.getElementById('status');
-    var restartBtn = document.getElementById('restartBtn');
+    var statusElement = document.getElementById('chessStatus');
+    var restartBtn = document.getElementById('chessRestart');
 
     // Update the game status text
     function updateStatus() {
