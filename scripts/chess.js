@@ -1,10 +1,9 @@
-// Wait for the DOM to be fully loaded
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize Chess.js game instance
     var game = new Chess();
 
     // Initialize Chessboard.js board
-    var board = Chessboard('chessBoard', {
+    var board = ChessBoard('board', {
         draggable: true,
         position: 'start',
         onDragStart: onDragStart,
@@ -13,8 +12,8 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Elements
-    var statusElement = document.getElementById('chessStatus');
-    var restartBtn = document.getElementById('chessRestart');
+    var statusElement = document.getElementById('status');
+    var restartBtn = document.getElementById('restartBtn');
 
     // Update the game status text
     function updateStatus() {
@@ -56,9 +55,6 @@ document.addEventListener('DOMContentLoaded', function() {
             (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
             return false;
         }
-
-        // Allow the move
-        return true;
     }
 
     // When a piece is dropped
