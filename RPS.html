@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <title>剪刀石头布模拟</title>
+  <title>剪刀石头布模拟 - 追逐&逃跑</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -57,71 +57,67 @@
   <script>
     // ========== 全局参数 ==========
 
-    // 画布大小
-    const CANVAS_WIDTH = window.innerWidth;
+    const CANVAS_WIDTH  = window.innerWidth;
     const CANVAS_HEIGHT = window.innerHeight;
 
-    // 每个实体的渲染大小(可自行调整)，这里设为 40
+    // 每个实体的渲染大小(可自行调整)
     const ENTITY_SIZE = 40;
 
-    // 用于碰撞检测的半径(可根据实际图标大小和需求调整)
+    // 碰撞时判断用的半径(也可自行调整)
     const RADIUS = ENTITY_SIZE * 0.7;
     const COLLISION_DIST_SQ = RADIUS * RADIUS;
 
-    // 三种实体类型
+    // 三种类型
     const TYPE_SCISSOR = 'scissor';
     const TYPE_ROCK    = 'rock';
     const TYPE_PAPER   = 'paper';
 
-    // 存放实体的数组
+    // 实体数组
     let entities = [];
 
-    // 记录 requestAnimationFrame 的 ID，以防需要做其他控制
+    // requestAnimationFrame ID
     let animationId = null;
 
-    // ========== 直接引用网上图标 (热链接) ==========
-    // （图标来自 flaticon，可能随时间变动。若链接失效，可自行更换）
+    // ========== 引用网上的真实“剪刀、石头、纸”图标 ==========
+    // 若链接失效，请自行到 Flaticon 或其他网站搜图替换
     const imgScissor = new Image();
-    imgScissor.src = 'https://cdn-icons-png.flaticon.com/512/3502/3502544.png';
+    imgScissor.src = 'https://cdn-icons-png.flaticon.com/512/1019/1019607.png';  // 剪刀
 
     const imgRock = new Image();
-    imgRock.src = 'https://cdn-icons-png.flaticon.com/512/3161/3161370.png';
+    imgRock.src = 'https://cdn-icons-png.flaticon.com/512/2828/2828598.png';     // 石头
 
     const imgPaper = new Image();
-    imgPaper.src = 'https://cdn-icons-png.flaticon.com/512/892/892337.png';
+    imgPaper.src = 'https://cdn-icons-png.flaticon.com/512/337/337946.png';      // 一张纸
 
     // ========== 获取 DOM ==========
 
-    const canvas = document.getElementById('myCanvas');
-    const ctx = canvas.getContext('2d');
-    canvas.width = CANVAS_WIDTH;
-    canvas.height = CANVAS_HEIGHT;
+    const canvas        = document.getElementById('myCanvas');
+    const ctx           = canvas.getContext('2d');
+    canvas.width        = CANVAS_WIDTH;
+    canvas.height       = CANVAS_HEIGHT;
 
-    const scissorInput = document.getElementById('scissorCount');
-    const rockInput    = document.getElementById('rockCount');
-    const paperInput   = document.getElementById('paperCount');
+    const scissorInput  = document.getElementById('scissorCount');
+    const rockInput     = document.getElementById('rockCount');
+    const paperInput    = document.getElementById('paperCount');
 
-    const speedRange   = document.getElementById('speedRange');
-    const speedValue   = document.getElementById('speedValue');
-    const restartBtn   = document.getElementById('restartBtn');
+    const speedRange    = document.getElementById('speedRange');
+    const speedValue    = document.getElementById('speedValue');
+    const restartBtn    = document.getElementById('restartBtn');
 
     // 当前速度
     let currentSpeed = parseFloat(speedRange.value);
 
-    // 监听速度滑杆的变化
+    // 监听速度滑杆
     speedRange.addEventListener('input', () => {
       currentSpeed = parseFloat(speedRange.value);
       speedValue.textContent = currentSpeed.toFixed(1);
     });
 
     // ========== 工具函数 ==========
-
-    // 两点距离平方
     function dist2(x1, y1, x2, y2) {
       return (x1 - x2)*(x1 - x2) + (y1 - y2)*(y1 - y2);
     }
 
-    // 生成随机数
     function randBetween(min, max) {
       return Math.random() * (max - min) + min;
     }
@@ -130,48 +126,72 @@
 
     class Entity {
       constructor(type, x, y) {
-        this.type = type;  // 'scissor','rock','paper'
-        this.x = x;
-        this.y = y;
-      }
-      
-      // 获取目标类型：自己要去追谁？
-      getTargetType() {
-        switch (this.type) {
-          case TYPE_SCISSOR: return TYPE_PAPER;
-          case TYPE_PAPER:   return TYPE_ROCK;
-          case TYPE_ROCK:    return TYPE_SCISSOR;
-        }
+        this.type = type;  // scissor, rock, paper
+        this.x    = x;
+        this.y    = y;
       }
 
-      // 移动：朝最近的“猎物”前进
-      move() {
-        const targetType = this.getTargetType();
-        let minDist = Infinity;
-        let targetEntity = null;
-
+      // 找到最近的、类型≠自己 的实体
+      findNearestDifferent() {
+        let minD2   = Infinity;
+        let nearest = null;
         for (let e of entities) {
           if (!e) continue;
-          if (e.type === targetType) {
-            const d2 = dist2(this.x, this.y, e.x, e.y);
-            if (d2 < minDist) {
-              minDist = d2;
-              targetEntity = e;
-            }
+          if (e.type === this.type) continue; // 跳过相同类型
+          const d2 = dist2(this.x, this.y, e.x, e.y);
+          if (d2 < minD2) {
+            minD2   = d2;
+            nearest = e;
           }
         }
-        // 如果找到目标，朝它移动
-        if (targetEntity) {
-          const dx = targetEntity.x - this.x;
-          const dy = targetEntity.y - this.y;
-          const length = Math.sqrt(dx*dx + dy*dy);
-          if (length > 0) {
-            const vx = (dx / length) * currentSpeed;
-            const vy = (dy / length) * currentSpeed;
-            this.x += vx;
-            this.y += vy;
-          }
+        return nearest;
+      }
+
+      // 移动逻辑：有“追逐”也有“逃跑”
+      move() {
+        const target = this.findNearestDifferent();
+        if (!target) return; // 没有最近目标，原地不动
+
+        // 根据自身类型，决定谁是“天敌”、谁是“猎物”
+        // 这里定义： scissor -> predator=rock, prey=paper
+        //           rock    -> predator=paper, prey=scissor
+        //           paper   -> predator=scissor, prey=rock
+        let predatorType, preyType;
+        if (this.type === TYPE_SCISSOR) {
+          predatorType = TYPE_ROCK;
+          preyType     = TYPE_PAPER;
+        } else if (this.type === TYPE_ROCK) {
+          predatorType = TYPE_PAPER;
+          preyType     = TYPE_SCISSOR;
+        } else { // paper
+          predatorType = TYPE_SCISSOR;
+          preyType     = TYPE_ROCK;
         }
+
+        // 判断target是天敌还是猎物
+        // 如果是天敌 => 逃跑；如果是猎物 => 追逐
+        const dx = target.x - this.x;
+        const dy = target.y - this.y;
+        const length = Math.sqrt(dx*dx + dy*dy);
+        if (length === 0) return;
+
+        // 如果 target.type === predatorType => 逃离
+        // 如果 target.type === preyType     => 追逐
+        // 计算单位方向向量
+        const ux = dx / length;
+        const uy = dy / length;
+
+        if (target.type === predatorType) {
+          // 逃跑 => 往反方向
+          this.x -= ux * currentSpeed;
+          this.y -= uy * currentSpeed;
+        } else if (target.type === preyType) {
+          // 追逐 => 往正方向
+          this.x += ux * currentSpeed;
+          this.y += uy * currentSpeed;
+        }
+        // 如果 target 既不是 predator 也不是 preyType，(比如另一个类型? 此处不会出现)
+        // 就什么都不做或原地不动。
       }
     }
 
@@ -179,11 +199,11 @@
 
     function checkCollisions() {
       for (let i = 0; i < entities.length; i++) {
-        for (let j = i + 1; j < entities.length; j++) {
+        for (let j = i+1; j < entities.length; j++) {
           const e1 = entities[i];
           const e2 = entities[j];
           if (!e1 || !e2) continue;
-
+          // 判断是否相距足够近
           if (dist2(e1.x, e1.y, e2.x, e2.y) <= COLLISION_DIST_SQ) {
             resolveCollision(e1, e2);
           }
@@ -191,13 +211,10 @@
       }
     }
 
-    // 碰撞后：胜利者把对方“转化”成自己的类型
-    // 剪刀 vs 布 => 布变剪刀
-    // 布 vs 石头 => 石头变布
-    // 石头 vs 剪刀 => 剪刀变石头
+    // 碰撞后：胜利一方把对方变成自己的类型
+    // (沿用之前的“剪刀克布, 布克石头, 石头克剪刀”)
     function resolveCollision(a, b) {
       if (!a || !b) return;
-
       // 剪刀 vs 布 => 布变剪刀
       if (
         (a.type === TYPE_SCISSOR && b.type === TYPE_PAPER) ||
@@ -224,9 +241,8 @@
       }
     }
 
-    // ========== 初始化与动画 ==========
+    // ========== 初始化与动画循环 ==========
 
-    // 初始化所有实体
     function initEntities(sCount, rCount, pCount) {
       entities = [];
       // 生成剪刀
@@ -258,11 +274,10 @@
     // 绘制实体
     function drawEntity(e) {
       let img;
-      if (e.type === TYPE_SCISSOR) img = imgScissor;
-      else if (e.type === TYPE_ROCK) img = imgRock;
-      else img = imgPaper;
+      if      (e.type === TYPE_SCISSOR) img = imgScissor;
+      else if (e.type === TYPE_ROCK)    img = imgRock;
+      else                              img = imgPaper;
 
-      // 让图片中心正好在实体 (x,y) 处
       ctx.drawImage(
         img,
         e.x - ENTITY_SIZE / 2,
@@ -286,19 +301,19 @@
       animationId = requestAnimationFrame(animate);
     }
 
-    // 点击【重新开始】
+    // ========== 事件绑定 ==========
+
     restartBtn.addEventListener('click', () => {
       const sCount = parseInt(scissorInput.value) || 0;
-      const rCount = parseInt(rockInput.value) || 0;
-      const pCount = parseInt(paperInput.value) || 0;
+      const rCount = parseInt(rockInput.value)    || 0;
+      const pCount = parseInt(paperInput.value)   || 0;
       initEntities(sCount, rCount, pCount);
     });
 
-    // 页面加载后，初始化并开启动画
     window.addEventListener('load', () => {
       const sCount = parseInt(scissorInput.value) || 0;
-      const rCount = parseInt(rockInput.value) || 0;
-      const pCount = parseInt(paperInput.value) || 0;
+      const rCount = parseInt(rockInput.value)    || 0;
+      const pCount = parseInt(paperInput.value)   || 0;
 
       initEntities(sCount, rCount, pCount);
       speedValue.textContent = currentSpeed.toFixed(1);
