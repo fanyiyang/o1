@@ -2,34 +2,80 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <title>剪刀石头布 - 追逐&逃跑 + 边界减速</title>
+  <title>剪刀石头布 - 逃跑时降速</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * {
+      margin: 0; 
+      padding: 0; 
+      box-sizing: border-box;
+      font-family: 'Segoe UI','Microsoft YaHei',sans-serif;
+    }
     body {
-      background: #ffffff;
+      background: #fdfdfd;
       user-select: none;
       overflow: hidden;
-      font-family: sans-serif;
     }
     #myCanvas {
       display: block;
     }
+
+    /* 底部控制面板更现代化的样式 */
     #control-panel {
       width: 100%;
-      box-sizing: border-box;
       position: fixed;
       bottom: 0;
       left: 0;
-      background: rgba(255,255,255,0.8);
-      padding: 10px;
-      border-top: 1px solid #ccc;
-      box-shadow: 0 -2px 5px rgba(0,0,0,0.2);
+      background: #ffffff;
+      border-top: 1px solid #ddd;
+      box-shadow: 0 -2px 6px rgba(0,0,0,0.1);
+      padding: 10px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+    }
+    #control-panel .control-group {
+      display: flex;
+      flex-direction: column;
+      margin-right: 10px;
+      min-width: 80px;
     }
     #control-panel label {
-      margin-right: 15px;
+      font-size: 0.88rem;
+      color: #333;
+      margin-bottom: 4px;
     }
-    #control-panel input[type="number"] {
-      width: 50px;
+    #control-panel input[type="number"],
+    #control-panel input[type="range"] {
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 4px;
+      font-size: 0.9rem;
+    }
+    #control-panel input[type="range"] {
+      width: 120px;
+    }
+    #control-panel button {
+      background: #0066cc;
+      color: #fff;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    #control-panel button:hover {
+      background: #0055a3;
+    }
+    /* 速度显示的小标签 */
+    .speed-value {
+      font-size: 0.88rem;
+      color: #333;
+      margin-left: 4px;
+      min-width: 30px;
+      display: inline-block;
+      text-align: right;
     }
   </style>
 </head>
@@ -38,32 +84,46 @@
 
   <!-- 底部控制面板 -->
   <div id="control-panel">
-    <label>剪刀数量:
-      <input id="scissorCount" type="number" value="20" min="0">
-    </label>
-    <label>石头数量:
-      <input id="rockCount" type="number" value="20" min="0">
-    </label>
-    <label>布数量:
-      <input id="paperCount" type="number" value="20" min="0">
-    </label>
-    <label>速度:
-      <input id="speedRange" type="range" min="0.1" max="5" step="0.1" value="1.5">
-      <span id="speedValue">1.5</span>
-    </label>
+    <!-- Net 统一数量 -->
+    <div class="control-group">
+      <label for="netCount">统一数量(Net):</label>
+      <input id="netCount" type="number" value="0" min="0" />
+    </div>
+    <!-- 若不使用Net，则可分别调节 剪刀、石头、布 -->
+    <div class="control-group">
+      <label for="scissorCount">剪刀数量:</label>
+      <input id="scissorCount" type="number" value="20" min="0" />
+    </div>
+    <div class="control-group">
+      <label for="rockCount">石头数量:</label>
+      <input id="rockCount" type="number" value="20" min="0" />
+    </div>
+    <div class="control-group">
+      <label for="paperCount">布数量:</label>
+      <input id="paperCount" type="number" value="20" min="0" />
+    </div>
+    <!-- 速度滑杆 -->
+    <div class="control-group">
+      <label for="speedRange">速度:</label>
+      <div>
+        <input id="speedRange" type="range" min="0.1" max="5" step="0.1" value="1.5" />
+        <span id="speedValue" class="speed-value">1.5</span>
+      </div>
+    </div>
+    <!-- 重新开始按钮 -->
     <button id="restartBtn">重新开始</button>
   </div>
 
   <script>
     // ========== 全局参数 ==========
 
-    const CANVAS_WIDTH = window.innerWidth;
+    const CANVAS_WIDTH  = window.innerWidth;
     const CANVAS_HEIGHT = window.innerHeight;
 
     // 每个实体的渲染大小
     const ENTITY_SIZE = 40;
 
-    // 用于碰撞检测的半径
+    // 用于碰撞检测的半径(可视需要调大/调小)
     const RADIUS = ENTITY_SIZE * 0.7;
     const COLLISION_DIST_SQ = RADIUS * RADIUS;
 
@@ -72,30 +132,28 @@
     const TYPE_ROCK    = 'rock';
     const TYPE_PAPER   = 'paper';
 
-    // 用于存放实体
+    // 实体数组
     let entities = [];
 
-    // 用于动画
-    let animationId = null;
-
-    // ========== 引用网上“剪刀、石头、纸”图标 ==========
-    // 如果链接失效，需自行更换
+    // ========== 引用网上“剪刀、石头、纸”图标(Flaticon) ==========
+    // 若链接失效，请自行更换
     const imgScissor = new Image();
-    imgScissor.src = 'https://cdn-icons-png.flaticon.com/512/1019/1019607.png';  // 剪刀
+    imgScissor.src = 'https://cdn-icons-png.flaticon.com/512/1019/1019607.png';
 
     const imgRock = new Image();
-    imgRock.src = 'https://cdn-icons-png.flaticon.com/512/2828/2828598.png';     // 石头
+    imgRock.src = 'https://cdn-icons-png.flaticon.com/512/2828/2828598.png';
 
     const imgPaper = new Image();
-    imgPaper.src = 'https://cdn-icons-png.flaticon.com/512/337/337946.png';      // 纸
+    imgPaper.src = 'https://cdn-icons-png.flaticon.com/512/337/337946.png';
 
-    // ========== 获取DOM ==========
+    // ========== 获取 DOM ==========
 
-    const canvas = document.getElementById('myCanvas');
-    const ctx = canvas.getContext('2d');
-    canvas.width = CANVAS_WIDTH;
-    canvas.height = CANVAS_HEIGHT;
+    const canvas       = document.getElementById('myCanvas');
+    const ctx          = canvas.getContext('2d');
+    canvas.width       = CANVAS_WIDTH;
+    canvas.height      = CANVAS_HEIGHT;
 
+    const netCountEl   = document.getElementById('netCount');
     const scissorInput = document.getElementById('scissorCount');
     const rockInput    = document.getElementById('rockCount');
     const paperInput   = document.getElementById('paperCount');
@@ -104,7 +162,7 @@
     const speedValue   = document.getElementById('speedValue');
     const restartBtn   = document.getElementById('restartBtn');
 
-    // 当前基础速度
+    // 当前速度(基础速度)
     let currentSpeed = parseFloat(speedRange.value);
 
     // 监听速度滑杆
@@ -113,43 +171,13 @@
       speedValue.textContent = currentSpeed.toFixed(1);
     });
 
-    // ========== “减速带”参数 ==========
-    // 在画布四周留下 margin 宽度的区域用来减速
-    const BOUNDARY_MARGIN = 80;      // 减速区的宽度
-    const MIN_SPEED_RATIO = 0.2;     // 在边界最边缘时，速度只剩下 20%
-
     // ========== 工具函数 ==========
-
     function dist2(x1, y1, x2, y2) {
       return (x1 - x2)*(x1 - x2) + (y1 - y2)*(y1 - y2);
     }
 
     function randBetween(min, max) {
       return Math.random() * (max - min) + min;
-    }
-
-    // 根据实体所在位置，计算一个 [MIN_SPEED_RATIO, 1] 的速度修正因子
-    // 离边界越近，因子越小 => 移动越慢
-    function getSpeedFactor(x, y) {
-      // 计算与四条边的距离
-      const distLeft   = x;
-      const distRight  = CANVAS_WIDTH  - x;
-      const distTop    = y;
-      const distBottom = CANVAS_HEIGHT - y;
-      // 找最近的边界距离
-      const minDist = Math.min(distLeft, distRight, distTop, distBottom);
-
-      // 若距离 >= BOUNDARY_MARGIN，则速度因子 = 1 (不减速)
-      if (minDist >= BOUNDARY_MARGIN) {
-        return 1.0;
-      } else {
-        // 线性插值: minDist = 0 => MIN_SPEED_RATIO
-        //            minDist = BOUNDARY_MARGIN => 1
-        // ratio = minDist / BOUNDARY_MARGIN in [0,1]
-        const ratio = minDist / BOUNDARY_MARGIN;
-        // 速度因子从 MIN_SPEED_RATIO ~ 1.0
-        return MIN_SPEED_RATIO + (1 - MIN_SPEED_RATIO) * ratio;
-      }
     }
 
     // ========== 实体类 ==========
@@ -177,7 +205,7 @@
         return nearest;
       }
 
-      // 移动：结合追逐 / 逃跑 + 边界减速
+      // 移动：结合追逐 / 逃跑
       move() {
         const target = this.findNearestDifferent();
         if (!target) return; // 没有目标 => 不动
@@ -204,15 +232,17 @@
         const ux = dx / length;
         const uy = dy / length;
 
-        // 判断天敌or猎物
+        // 如果是天敌 => 逃跑(速度变为 0.8 * currentSpeed)
+        // 如果是猎物 => 追逐(速度 = currentSpeed)
         if (target.type === predatorType) {
-          // 逃跑 => 反方向移动
-          this.x -= ux * currentSpeed * getSpeedFactor(this.x, this.y);
-          this.y -= uy * currentSpeed * getSpeedFactor(this.x, this.y);
+          // 逃跑 => 反方向
+          const escapeSpeed = 0.8 * currentSpeed;  // 逃跑时降速
+          this.x -= ux * escapeSpeed;
+          this.y -= uy * escapeSpeed;
         } else if (target.type === preyType) {
-          // 追逐 => 正方向移动
-          this.x += ux * currentSpeed * getSpeedFactor(this.x, this.y);
-          this.y += uy * currentSpeed * getSpeedFactor(this.x, this.y);
+          // 追逐 => 正方向
+          this.x += ux * currentSpeed;
+          this.y += uy * currentSpeed;
         }
       }
     }
@@ -225,7 +255,7 @@
           const e1 = entities[i];
           const e2 = entities[j];
           if (!e1 || !e2) continue;
-          // 判断是否相距足够近
+          // 若距离足够近，则碰撞
           if (dist2(e1.x, e1.y, e2.x, e2.y) <= COLLISION_DIST_SQ) {
             resolveCollision(e1, e2);
           }
@@ -233,7 +263,8 @@
       }
     }
 
-    // 碰撞后：胜利一方把对方变成自己的类型(剪刀克纸，纸克石头，石头克剪刀)
+    // 碰撞后：胜利一方把对方变成自己的类型
+    // (剪刀克纸，纸克石头，石头克剪刀)
     function resolveCollision(a, b) {
       if (!a || !b) return;
       // 剪刀 vs 布 => 布变剪刀
@@ -264,40 +295,59 @@
 
     // ========== 初始化与动画循环 ==========
 
-    function initEntities(sCount, rCount, pCount) {
+    // 初始化实体
+    function initEntities(net, sCount, rCount, pCount) {
       entities = [];
+
+      // 如果 net>0，则把剪刀、石头、布的数量都设为 net
+      let sNum = sCount;
+      let rNum = rCount;
+      let pNum = pCount;
+
+      if (net > 0) {
+        sNum = net;
+        rNum = net;
+        pNum = net;
+      }
+
       // 生成剪刀
-      for (let i = 0; i < sCount; i++){
-        entities.push(new Entity(
-          TYPE_SCISSOR,
-          randBetween(0, CANVAS_WIDTH),
-          randBetween(0, CANVAS_HEIGHT)
-        ));
+      for (let i = 0; i < sNum; i++){
+        entities.push(
+          new Entity(
+            TYPE_SCISSOR,
+            randBetween(0, CANVAS_WIDTH),
+            randBetween(0, CANVAS_HEIGHT)
+          )
+        );
       }
       // 生成石头
-      for (let i = 0; i < rCount; i++){
-        entities.push(new Entity(
-          TYPE_ROCK,
-          randBetween(0, CANVAS_WIDTH),
-          randBetween(0, CANVAS_HEIGHT)
-        ));
+      for (let i = 0; i < rNum; i++){
+        entities.push(
+          new Entity(
+            TYPE_ROCK,
+            randBetween(0, CANVAS_WIDTH),
+            randBetween(0, CANVAS_HEIGHT)
+          )
+        );
       }
       // 生成布
-      for (let i = 0; i < pCount; i++){
-        entities.push(new Entity(
-          TYPE_PAPER,
-          randBetween(0, CANVAS_WIDTH),
-          randBetween(0, CANVAS_HEIGHT)
-        ));
+      for (let i = 0; i < pNum; i++){
+        entities.push(
+          new Entity(
+            TYPE_PAPER,
+            randBetween(0, CANVAS_WIDTH),
+            randBetween(0, CANVAS_HEIGHT)
+          )
+        );
       }
     }
 
     // 绘制实体
     function drawEntity(e) {
       let img;
-      if (e.type === TYPE_SCISSOR) img = imgScissor;
-      else if (e.type === TYPE_ROCK) img = imgRock;
-      else img = imgPaper;
+      if      (e.type === TYPE_SCISSOR) img = imgScissor;
+      else if (e.type === TYPE_ROCK)    img = imgRock;
+      else                              img = imgPaper;
 
       ctx.drawImage(
         img,
@@ -308,56 +358,37 @@
       );
     }
 
-    // 绘制边界“减速带”区域(用半透明红色标示)
-    function drawBoundaryZone() {
-      ctx.save();
-      ctx.fillStyle = 'rgba(255, 0, 0, 0.1)';
-
-      // 上边界
-      ctx.fillRect(0, 0, CANVAS_WIDTH, BOUNDARY_MARGIN);
-      // 下边界
-      ctx.fillRect(0, CANVAS_HEIGHT - BOUNDARY_MARGIN, CANVAS_WIDTH, BOUNDARY_MARGIN);
-      // 左边界
-      ctx.fillRect(0, BOUNDARY_MARGIN, BOUNDARY_MARGIN, CANVAS_HEIGHT - 2 * BOUNDARY_MARGIN);
-      // 右边界
-      ctx.fillRect(CANVAS_WIDTH - BOUNDARY_MARGIN, BOUNDARY_MARGIN, BOUNDARY_MARGIN, CANVAS_HEIGHT - 2 * BOUNDARY_MARGIN);
-
-      ctx.restore();
-    }
-
     // 动画循环
     function animate() {
-      // 清屏
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // 先绘制边界区域
-      drawBoundaryZone();
-
       // 移动 + 碰撞
-      entities.forEach(e => { if (e) e.move(); });
+      entities.forEach(e => { if(e) e.move(); });
       checkCollisions();
 
       // 绘制
-      entities.forEach(e => { if (e) drawEntity(e); });
+      entities.forEach(e => { if(e) drawEntity(e); });
       
-      animationId = requestAnimationFrame(animate);
+      requestAnimationFrame(animate);
     }
 
-    // ========== 事件绑定 ==========
-
+    // 重新开始事件
     restartBtn.addEventListener('click', () => {
-      const sCount = parseInt(scissorInput.value) || 0;
-      const rCount = parseInt(rockInput.value) || 0;
-      const pCount = parseInt(paperInput.value) || 0;
-      initEntities(sCount, rCount, pCount);
+      const netVal   = parseInt(netCountEl.value) || 0;
+      const sCount   = parseInt(scissorInput.value) || 0;
+      const rCount   = parseInt(rockInput.value)    || 0;
+      const pCount   = parseInt(paperInput.value)   || 0;
+      initEntities(netVal, sCount, rCount, pCount);
     });
 
+    // 页面加载时初始化
     window.addEventListener('load', () => {
+      const netVal = parseInt(netCountEl.value) || 0;
       const sCount = parseInt(scissorInput.value) || 0;
       const rCount = parseInt(rockInput.value) || 0;
       const pCount = parseInt(paperInput.value) || 0;
 
-      initEntities(sCount, rCount, pCount);
+      initEntities(netVal, sCount, rCount, pCount);
       speedValue.textContent = currentSpeed.toFixed(1);
       animate();
     });
