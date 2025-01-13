@@ -11,35 +11,57 @@
       user-select: none;
       overflow: hidden;
     }
-    #control-panel {
-      position: fixed;
-      top: 10px;
-      left: 10px;
-      z-index: 999;
-      background: rgba(255,255,255,0.8);
-      padding: 10px;
-      border-radius: 8px;
-      box-shadow: 0 0 5px #888;
-    }
     #myCanvas {
       display: block;
+    }
+    #control-panel {
+      width: 100%;
+      box-sizing: border-box;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      background: rgba(255,255,255,0.8);
+      padding: 10px;
+      border-top: 1px solid #ccc;
+      box-shadow: 0 -2px 5px rgba(0,0,0,0.2);
+      font-family: sans-serif;
+    }
+    #control-panel label {
+      margin-right: 10px;
     }
   </style>
 </head>
 <body>
+  <canvas id="myCanvas"></canvas>
+
+  <!-- 底部控制面板 -->
   <div id="control-panel">
-    <label>剪刀数量: <input id="scissorCount" type="number" value="20" min="0"></label><br />
-    <label>石头数量: <input id="rockCount" type="number" value="20" min="0"></label><br />
-    <label>布数量: <input id="paperCount" type="number" value="20" min="0"></label><br />
+    <label>剪刀数量:
+      <input id="scissorCount" type="number" value="20" min="0" style="width:60px;">
+    </label>
+    <label>石头数量:
+      <input id="rockCount" type="number" value="20" min="0" style="width:60px;">
+    </label>
+    <label>布数量:
+      <input id="paperCount" type="number" value="20" min="0" style="width:60px;">
+    </label>
+    <label>速度:
+      <input id="speedRange" type="range" min="0.1" max="5" step="0.1" value="1.5" />
+      <span id="speedValue">1.5</span>
+    </label>
     <button id="restartBtn">重新开始</button>
   </div>
-  <canvas id="myCanvas"></canvas>
+
   <script>
-    // ========= 全局参数，可根据需要自行调节 =========
-    const MAX_SPEED = 1.5;     // 移动速度(像素/帧)
-    const RADIUS = 5;         // 实体的“碰撞半径”
+    // ========== 全局参数 ==========
+
+    // 画布大小
     const CANVAS_WIDTH = window.innerWidth;
     const CANVAS_HEIGHT = window.innerHeight;
+
+    // 碰撞检测的碰撞半径
+    const RADIUS = 5;   // 实体大小
+    const COLLISION_DIST_SQ = (2 * RADIUS) * (2 * RADIUS);
 
     // 三种实体类型
     const TYPE_SCISSOR = 'scissor';
@@ -49,10 +71,36 @@
     // 存放实体的数组
     let entities = [];
 
-    // 实体类
+    // 用于动画的 requestAnimationFrame ID
+    let animationId = null;
+
+    // 从页面中获取 DOM 元素
+    const canvas = document.getElementById('myCanvas');
+    const ctx = canvas.getContext('2d');
+    const scissorInput = document.getElementById('scissorCount');
+    const rockInput    = document.getElementById('rockCount');
+    const paperInput   = document.getElementById('paperCount');
+    const speedRange   = document.getElementById('speedRange');
+    const speedValue   = document.getElementById('speedValue');
+    const restartBtn   = document.getElementById('restartBtn');
+
+    canvas.width = CANVAS_WIDTH;
+    canvas.height = CANVAS_HEIGHT;
+
+    // 当前速度（从滑杆取值）
+    let currentSpeed = parseFloat(speedRange.value);
+
+    // 监听速度滑杆的变化
+    speedRange.addEventListener('input', () => {
+      currentSpeed = parseFloat(speedRange.value);
+      speedValue.textContent = currentSpeed.toFixed(1);
+    });
+
+    // ========== 实体类 ==========
+
     class Entity {
       constructor(type, x, y) {
-        this.type = type;   // 'scissor','rock','paper'
+        this.type = type; // 'scissor','rock','paper'
         this.x = x;
         this.y = y;
       }
@@ -69,16 +117,17 @@
         }
       }
 
-      // 每帧移动
       move() {
-        // 找到最近的猎物
+        // 找到最近的“猎物”
         const targetType = this.getTargetType();
         let minDist = Infinity;
         let targetEntity = null;
+
+        // 遍历所有实体，找到最近的目标
         for (let e of entities) {
+          if (!e) continue;
           if (e.type === targetType) {
-            // 计算距离
-            let d2 = dist2(this.x, this.y, e.x, e.y);
+            const d2 = dist2(this.x, this.y, e.x, e.y);
             if (d2 < minDist) {
               minDist = d2;
               targetEntity = e;
@@ -87,12 +136,13 @@
         }
         // 如果找到目标，则朝目标移动
         if (targetEntity) {
-          let dx = targetEntity.x - this.x;
-          let dy = targetEntity.y - this.y;
-          let length = Math.sqrt(dx*dx + dy*dy);
+          const dx = targetEntity.x - this.x;
+          const dy = targetEntity.y - this.y;
+          const length = Math.sqrt(dx*dx + dy*dy);
           if (length > 0) {
-            let vx = (dx / length) * MAX_SPEED;
-            let vy = (dy / length) * MAX_SPEED;
+            // 用当前速度进行移动
+            const vx = (dx / length) * currentSpeed;
+            const vy = (dy / length) * currentSpeed;
             this.x += vx;
             this.y += vy;
           }
@@ -100,30 +150,38 @@
       }
     }
 
-    // 各实体碰撞时的处理：谁吃掉谁？
+    // ========== 碰撞检测相关 ==========
+
+    // 计算两点距离的平方
+    function dist2(x1, y1, x2, y2) {
+      return (x1 - x2)*(x1 - x2) + (y1 - y2)*(y1 - y2);
+    }
+
+    // 每帧都要检查碰撞
     function checkCollisions() {
-      // 每次循环都检测各种碰撞
       for (let i = 0; i < entities.length; i++) {
         for (let j = i+1; j < entities.length; j++) {
           const e1 = entities[i];
           const e2 = entities[j];
-          // 若距离足够近，则发生碰撞
-          if (dist2(e1.x, e1.y, e2.x, e2.y) <= (2*RADIUS)*(2*RADIUS)) {
-            // 判断碰撞关系
+          if (!e1 || !e2) continue;
+          // 判断是否相距足够近
+          if (dist2(e1.x, e1.y, e2.x, e2.y) <= COLLISION_DIST_SQ) {
             resolveCollision(e1, e2);
           }
         }
       }
-      // 过滤掉被吃掉的实体
+      // 移除被吃掉的实体（已置空）
       entities = entities.filter(e => e !== null);
     }
 
-    // 碰撞结果：谁留下，谁被消灭
+    // 碰撞结果：谁被吃掉
     function resolveCollision(a, b) {
       if (!a || !b) return;
       // 剪刀 vs 布：布消失
-      if ( (a.type === TYPE_SCISSOR && b.type === TYPE_PAPER) ||
-           (a.type === TYPE_PAPER   && b.type === TYPE_SCISSOR) ) {
+      if (
+        (a.type === TYPE_SCISSOR && b.type === TYPE_PAPER) ||
+        (a.type === TYPE_PAPER   && b.type === TYPE_SCISSOR)
+      ) {
         if (a.type === TYPE_PAPER) {
           removeEntity(a);
         } else {
@@ -131,8 +189,10 @@
         }
       }
       // 布 vs 石头：石头消失
-      else if ( (a.type === TYPE_PAPER && b.type === TYPE_ROCK) ||
-                (a.type === TYPE_ROCK  && b.type === TYPE_PAPER) ) {
+      else if (
+        (a.type === TYPE_PAPER && b.type === TYPE_ROCK) ||
+        (a.type === TYPE_ROCK  && b.type === TYPE_PAPER)
+      ) {
         if (a.type === TYPE_ROCK) {
           removeEntity(a);
         } else {
@@ -140,8 +200,10 @@
         }
       }
       // 石头 vs 剪刀：剪刀消失
-      else if ( (a.type === TYPE_ROCK && b.type === TYPE_SCISSOR) ||
-                (a.type === TYPE_SCISSOR && b.type === TYPE_ROCK) ) {
+      else if (
+        (a.type === TYPE_ROCK && b.type === TYPE_SCISSOR) ||
+        (a.type === TYPE_SCISSOR && b.type === TYPE_ROCK)
+      ) {
         if (a.type === TYPE_SCISSOR) {
           removeEntity(a);
         } else {
@@ -150,99 +212,101 @@
       }
     }
 
-    // 将某个实体标记为null，之后过滤
+    // 将实体标记为null
     function removeEntity(entity) {
       const idx = entities.indexOf(entity);
-      if (idx >= 0) entities[idx] = null;
+      if (idx >= 0) {
+        entities[idx] = null;
+      }
     }
 
-    // 生成随机数函数
-    function randBetween(min, max) {
-      return Math.random() * (max - min) + min;
-    }
-    
-    // 两点距离平方
-    function dist2(x1, y1, x2, y2) {
-      return (x1 - x2)*(x1 - x2) + (y1 - y2)*(y1 - y2);
-    }
+    // ========== 初始化与动画循环 ==========
 
-    // 初始化函数
+    // 初始化实体
     function initEntities(sCount, rCount, pCount) {
       entities = [];
       // 生成剪刀
-      for(let i = 0; i < sCount; i++){
-        entities.push(
-          new Entity(TYPE_SCISSOR, randBetween(0, CANVAS_WIDTH), randBetween(0, CANVAS_HEIGHT))
-        );
+      for (let i = 0; i < sCount; i++){
+        entities.push(new Entity(
+          TYPE_SCISSOR,
+          randBetween(0, CANVAS_WIDTH),
+          randBetween(0, CANVAS_HEIGHT)
+        ));
       }
       // 生成石头
-      for(let i = 0; i < rCount; i++){
-        entities.push(
-          new Entity(TYPE_ROCK, randBetween(0, CANVAS_WIDTH), randBetween(0, CANVAS_HEIGHT))
-        );
+      for (let i = 0; i < rCount; i++){
+        entities.push(new Entity(
+          TYPE_ROCK,
+          randBetween(0, CANVAS_WIDTH),
+          randBetween(0, CANVAS_HEIGHT)
+        ));
       }
       // 生成布
-      for(let i = 0; i < pCount; i++){
-        entities.push(
-          new Entity(TYPE_PAPER, randBetween(0, CANVAS_WIDTH), randBetween(0, CANVAS_HEIGHT))
-        );
+      for (let i = 0; i < pCount; i++){
+        entities.push(new Entity(
+          TYPE_PAPER,
+          randBetween(0, CANVAS_WIDTH),
+          randBetween(0, CANVAS_HEIGHT)
+        ));
       }
     }
 
-    // =========== 动画绘制部分 ===========
-    const canvas = document.getElementById("myCanvas");
-    const ctx = canvas.getContext("2d");
-    canvas.width = CANVAS_WIDTH;
-    canvas.height = CANVAS_HEIGHT;
+    // 生成随机数
+    function randBetween(min, max) {
+      return Math.random() * (max - min) + min;
+    }
 
+    // 绘制实体
     function drawEntity(e) {
-      // 不同实体用不同颜色表示，或不同符号表示
+      // 不同实体用不同颜色表示
       // 剪刀=红色，石头=灰色，布=绿色
-      if (e.type === TYPE_SCISSOR) {
-        ctx.fillStyle = 'red';
-      } else if (e.type === TYPE_ROCK) {
-        ctx.fillStyle = 'gray';
-      } else {
-        ctx.fillStyle = 'green';
-      }
+      if (e.type === TYPE_SCISSOR) ctx.fillStyle = 'red';
+      else if (e.type === TYPE_ROCK) ctx.fillStyle = 'gray';
+      else ctx.fillStyle = 'green';
+
       ctx.beginPath();
       ctx.arc(e.x, e.y, RADIUS, 0, 2 * Math.PI);
       ctx.fill();
     }
 
+    // 动画循环
     function animate() {
-      // 清屏
+      // 清空画布
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // 每帧更新实体位置
+      // 更新位置
       entities.forEach(e => {
         if (e) e.move();
       });
       // 检查碰撞
       checkCollisions();
-
-      // 画出存活的实体
+      // 绘制剩余实体
       entities.forEach(e => {
         if (e) drawEntity(e);
       });
-
-      requestAnimationFrame(animate);
+      
+      // 如果仍然有多种类型在场，就继续动画
+      animationId = requestAnimationFrame(animate);
     }
 
-    // 绑定按钮事件：重新开始
-    document.getElementById("restartBtn").addEventListener("click", () => {
-      const sCount = parseInt(document.getElementById("scissorCount").value) || 0;
-      const rCount = parseInt(document.getElementById("rockCount").value) || 0;
-      const pCount = parseInt(document.getElementById("paperCount").value) || 0;
+    // 重新开始按钮事件
+    restartBtn.addEventListener('click', () => {
+      const sCount = parseInt(scissorInput.value) || 0;
+      const rCount = parseInt(rockInput.value) || 0;
+      const pCount = parseInt(paperInput.value) || 0;
       initEntities(sCount, rCount, pCount);
     });
 
-    // 页面加载后自动开始
-    window.addEventListener("load", () => {
-      const sCount = parseInt(document.getElementById("scissorCount").value) || 0;
-      const rCount = parseInt(document.getElementById("rockCount").value) || 0;
-      const pCount = parseInt(document.getElementById("paperCount").value) || 0;
-      initEntities(sCount, rCount, pCount);
+    // 页面加载完毕后初始化并开始动画
+    window.addEventListener('load', () => {
+      initEntities(
+        parseInt(scissorInput.value) || 0,
+        parseInt(rockInput.value)    || 0,
+        parseInt(paperInput.value)   || 0
+      );
+      // 更新一次速度显示
+      speedValue.textContent = currentSpeed.toFixed(1);
+      // 启动动画
       animate();
     });
   </script>
