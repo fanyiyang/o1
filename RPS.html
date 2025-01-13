@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <title>剪刀石头布 - 逃跑时降速</title>
+  <title>剪刀石头布 - 边界减速 + 追逐/逃跑</title>
   <style>
     * {
       margin: 0; 
@@ -13,7 +13,7 @@
     body {
       background: #fdfdfd;
       user-select: none;
-      overflow: hidden;
+      overflow: hidden; /* 防止滚动条出现 */
     }
     #myCanvas {
       display: block;
@@ -123,7 +123,7 @@
     // 每个实体的渲染大小
     const ENTITY_SIZE = 40;
 
-    // 用于碰撞检测的半径(可视需要调大/调小)
+    // 用于碰撞检测的半径
     const RADIUS = ENTITY_SIZE * 0.7;
     const COLLISION_DIST_SQ = RADIUS * RADIUS;
 
@@ -180,6 +180,42 @@
       return Math.random() * (max - min) + min;
     }
 
+    // 计算并衰减“向外越界”方向上的速度分量
+    // 使用一个快速衰减函数(例如 sqrt) 使得越靠近边界，该方向速度越接近0
+    function clampVelocityByBoundary(x, y, vx, vy) {
+      const margin = 80; // 你可以自行调整此边界缓冲区
+
+      let newVx = vx;
+      let newVy = vy;
+
+      // 1. 左边界: x < margin 且 vx<0 => 尝试向左越界
+      if (x < margin && vx < 0) {
+        // distLeft = x(距离左侧)
+        // factor = sqrt(x / margin) ∈ [0,1]，越靠近边界越趋向0
+        const factor = Math.sqrt(x / margin);
+        newVx *= factor;
+      }
+      // 2. 右边界: x > (CANVAS_WIDTH - margin) 且 vx>0 => 向右越界
+      if (x > CANVAS_WIDTH - margin && vx > 0) {
+        const distRight = CANVAS_WIDTH - x; 
+        const factor = Math.sqrt(distRight / margin);
+        newVx *= factor;
+      }
+      // 3. 上边界: y < margin 且 vy<0 => 向上越界
+      if (y < margin && vy < 0) {
+        const factor = Math.sqrt(y / margin);
+        newVy *= factor;
+      }
+      // 4. 下边界: y > (CANVAS_HEIGHT - margin) 且 vy>0 => 向下越界
+      if (y > CANVAS_HEIGHT - margin && vy > 0) {
+        const distBottom = CANVAS_HEIGHT - y;
+        const factor = Math.sqrt(distBottom / margin);
+        newVy *= factor;
+      }
+
+      return { vx: newVx, vy: newVy };
+    }
+
     // ========== 实体类 ==========
 
     class Entity {
@@ -205,10 +241,10 @@
         return nearest;
       }
 
-      // 移动：结合追逐 / 逃跑
+      // 移动：结合追逐 / 逃跑 + 边界减速
       move() {
         const target = this.findNearestDifferent();
-        if (!target) return; // 没有目标 => 不动
+        if (!target) return; // 没有其他类型 => 不动
 
         // 根据自身类型，定义“天敌”(predator)和“猎物”(prey)
         let predatorType, preyType;
@@ -227,23 +263,35 @@
         const dx = target.x - this.x;
         const dy = target.y - this.y;
         const length = Math.sqrt(dx*dx + dy*dy);
-        if (length === 0) return;
+        if (length === 0) return; // 重叠在一起
 
-        const ux = dx / length;
-        const uy = dy / length;
+        // 归一化方向
+        let ux = dx / length;
+        let uy = dy / length;
 
-        // 如果是天敌 => 逃跑(速度变为 0.8 * currentSpeed)
-        // 如果是猎物 => 追逐(速度 = currentSpeed)
+        // 根据天敌/猎物决定速度
+        let vx, vy;
         if (target.type === predatorType) {
-          // 逃跑 => 反方向
-          const escapeSpeed = 0.8 * currentSpeed;  // 逃跑时降速
-          this.x -= ux * escapeSpeed;
-          this.y -= uy * escapeSpeed;
+          // 逃跑 => 反方向 & 速度变为 0.8 * currentSpeed
+          const escapeSpeed = 0.8 * currentSpeed;
+          vx = -ux * escapeSpeed;
+          vy = -uy * escapeSpeed;
         } else if (target.type === preyType) {
-          // 追逐 => 正方向
-          this.x += ux * currentSpeed;
-          this.y += uy * currentSpeed;
+          // 追逐 => 正方向 & 速度 = currentSpeed
+          vx = ux * currentSpeed;
+          vy = uy * currentSpeed;
+        } else {
+          // 其他情况(如同类) => 不动
+          vx = 0; 
+          vy = 0;
         }
+
+        // 对 (vx, vy) 进行边界衰减，防止跑出屏幕
+        const { vx: clampedVx, vy: clampedVy } = clampVelocityByBoundary(this.x, this.y, vx, vy);
+
+        // 更新位置
+        this.x += clampedVx;
+        this.y += clampedVy;
       }
     }
 
@@ -363,21 +411,21 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       // 移动 + 碰撞
-      entities.forEach(e => { if(e) e.move(); });
+      entities.forEach(e => e && e.move());
       checkCollisions();
 
       // 绘制
-      entities.forEach(e => { if(e) drawEntity(e); });
+      entities.forEach(e => e && drawEntity(e));
       
       requestAnimationFrame(animate);
     }
 
     // 重新开始事件
     restartBtn.addEventListener('click', () => {
-      const netVal   = parseInt(netCountEl.value) || 0;
-      const sCount   = parseInt(scissorInput.value) || 0;
-      const rCount   = parseInt(rockInput.value)    || 0;
-      const pCount   = parseInt(paperInput.value)   || 0;
+      const netVal = parseInt(netCountEl.value) || 0;
+      const sCount = parseInt(scissorInput.value) || 0;
+      const rCount = parseInt(rockInput.value)    || 0;
+      const pCount = parseInt(paperInput.value)   || 0;
       initEntities(netVal, sCount, rCount, pCount);
     });
 
