@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <title>剪刀石头布 - 边界减速 + 追逐/逃跑</title>
+  <title>剪刀石头布 - 防止越界 + 追逐/逃跑</title>
   <style>
     * {
       margin: 0; 
@@ -182,38 +182,50 @@
 
     // 计算并衰减“向外越界”方向上的速度分量
     // 使用一个快速衰减函数(例如 sqrt) 使得越靠近边界，该方向速度越接近0
+    const MARGIN = 30; // 调小边缘区, 提前将实体“拉回”, 防止它真的跑出屏幕
     function clampVelocityByBoundary(x, y, vx, vy) {
-      const margin = 80; // 你可以自行调整此边界缓冲区
-
       let newVx = vx;
       let newVy = vy;
 
-      // 1. 左边界: x < margin 且 vx<0 => 尝试向左越界
-      if (x < margin && vx < 0) {
-        // distLeft = x(距离左侧)
-        // factor = sqrt(x / margin) ∈ [0,1]，越靠近边界越趋向0
-        const factor = Math.sqrt(x / margin);
-        newVx *= factor;
-      }
-      // 2. 右边界: x > (CANVAS_WIDTH - margin) 且 vx>0 => 向右越界
-      if (x > CANVAS_WIDTH - margin && vx > 0) {
-        const distRight = CANVAS_WIDTH - x; 
-        const factor = Math.sqrt(distRight / margin);
-        newVx *= factor;
-      }
-      // 3. 上边界: y < margin 且 vy<0 => 向上越界
-      if (y < margin && vy < 0) {
-        const factor = Math.sqrt(y / margin);
-        newVy *= factor;
-      }
-      // 4. 下边界: y > (CANVAS_HEIGHT - margin) 且 vy>0 => 向下越界
-      if (y > CANVAS_HEIGHT - margin && vy > 0) {
-        const distBottom = CANVAS_HEIGHT - y;
-        const factor = Math.sqrt(distBottom / margin);
-        newVy *= factor;
-      }
+      // 距离四个边界
+      const distLeft   = x;
+      const distRight  = CANVAS_WIDTH  - x;
+      const distTop    = y;
+      const distBottom = CANVAS_HEIGHT - y;
 
+      // left
+      if (distLeft < MARGIN && vx < 0) {
+        // ratio = sqrt(distLeft / MARGIN)
+        const factor = Math.sqrt(distLeft / MARGIN);
+        newVx *= factor;
+      }
+      // right
+      if (distRight < MARGIN && vx > 0) {
+        const factor = Math.sqrt(distRight / MARGIN);
+        newVx *= factor;
+      }
+      // top
+      if (distTop < MARGIN && vy < 0) {
+        const factor = Math.sqrt(distTop / MARGIN);
+        newVy *= factor;
+      }
+      // bottom
+      if (distBottom < MARGIN && vy > 0) {
+        const factor = Math.sqrt(distBottom / MARGIN);
+        newVy *= factor;
+      }
       return { vx: newVx, vy: newVy };
+    }
+
+    // 最后再强制修正位置 (坐标Clamp)
+    // 防止浮点误差造成小范围越界导致“消失”
+    function clampPosition(e) {
+      // 留一点点容差: 0 + 0.1 ~ width - 0.1  (或可直接用 0)
+      const offset = 0.1; 
+      if (e.x < offset) e.x = offset;
+      if (e.x > CANVAS_WIDTH - offset) e.x = CANVAS_WIDTH - offset;
+      if (e.y < offset) e.y = offset;
+      if (e.y > CANVAS_HEIGHT - offset) e.y = CANVAS_HEIGHT - offset;
     }
 
     // ========== 实体类 ==========
@@ -225,7 +237,7 @@
         this.y    = y;
       }
 
-      // 找到最近的、类型≠自己 的实体
+      // 找到最近的、与自己类型不同的实体
       findNearestDifferent() {
         let minD2   = Infinity;
         let nearest = null;
@@ -241,12 +253,15 @@
         return nearest;
       }
 
-      // 移动：结合追逐 / 逃跑 + 边界减速
+      // 移动
       move() {
         const target = this.findNearestDifferent();
-        if (!target) return; // 没有其他类型 => 不动
+        if (!target) {
+          // 若没找到别的种类 => 不动
+          return;
+        }
 
-        // 根据自身类型，定义“天敌”(predator)和“猎物”(prey)
+        // 决定天敌/猎物
         let predatorType, preyType;
         if (this.type === TYPE_SCISSOR) {
           predatorType = TYPE_ROCK;    
@@ -265,33 +280,31 @@
         const length = Math.sqrt(dx*dx + dy*dy);
         if (length === 0) return; // 重叠在一起
 
-        // 归一化方向
-        let ux = dx / length;
-        let uy = dy / length;
+        const ux = dx / length;
+        const uy = dy / length;
 
-        // 根据天敌/猎物决定速度
-        let vx, vy;
+        let vx = 0, vy = 0;
+
+        // 逃跑 or 追逐
         if (target.type === predatorType) {
-          // 逃跑 => 反方向 & 速度变为 0.8 * currentSpeed
-          const escapeSpeed = 0.8 * currentSpeed;
-          vx = -ux * escapeSpeed;
-          vy = -uy * escapeSpeed;
+          // 逃跑 => 反向 * 0.8 * currentSpeed
+          vx = -ux * (0.8 * currentSpeed);
+          vy = -uy * (0.8 * currentSpeed);
         } else if (target.type === preyType) {
-          // 追逐 => 正方向 & 速度 = currentSpeed
-          vx = ux * currentSpeed;
-          vy = uy * currentSpeed;
-        } else {
-          // 其他情况(如同类) => 不动
-          vx = 0; 
-          vy = 0;
+          // 追逐 => 同向 * currentSpeed
+          vx =  ux * currentSpeed;
+          vy =  uy * currentSpeed;
         }
 
-        // 对 (vx, vy) 进行边界衰减，防止跑出屏幕
-        const { vx: clampedVx, vy: clampedVy } = clampVelocityByBoundary(this.x, this.y, vx, vy);
+        // 边界快速衰减
+        const { vx: cVx, vy: cVy } = clampVelocityByBoundary(this.x, this.y, vx, vy);
 
         // 更新位置
-        this.x += clampedVx;
-        this.y += clampedVy;
+        this.x += cVx;
+        this.y += cVy;
+
+        // 强制收敛坐标到画布内部
+        clampPosition(this);
       }
     }
 
@@ -311,8 +324,7 @@
       }
     }
 
-    // 碰撞后：胜利一方把对方变成自己的类型
-    // (剪刀克纸，纸克石头，石头克剪刀)
+    // 碰撞后：胜者让对方变为自己的类型
     function resolveCollision(a, b) {
       if (!a || !b) return;
       // 剪刀 vs 布 => 布变剪刀
@@ -343,15 +355,13 @@
 
     // ========== 初始化与动画循环 ==========
 
-    // 初始化实体
     function initEntities(net, sCount, rCount, pCount) {
       entities = [];
 
-      // 如果 net>0，则把剪刀、石头、布的数量都设为 net
+      // 如果 net>0，则把剪刀、石头、布都设为 net
       let sNum = sCount;
       let rNum = rCount;
       let pNum = pCount;
-
       if (net > 0) {
         sNum = net;
         rNum = net;
@@ -360,33 +370,27 @@
 
       // 生成剪刀
       for (let i = 0; i < sNum; i++){
-        entities.push(
-          new Entity(
-            TYPE_SCISSOR,
-            randBetween(0, CANVAS_WIDTH),
-            randBetween(0, CANVAS_HEIGHT)
-          )
-        );
+        entities.push(new Entity(
+          TYPE_SCISSOR,
+          randBetween(0, CANVAS_WIDTH),
+          randBetween(0, CANVAS_HEIGHT)
+        ));
       }
       // 生成石头
       for (let i = 0; i < rNum; i++){
-        entities.push(
-          new Entity(
-            TYPE_ROCK,
-            randBetween(0, CANVAS_WIDTH),
-            randBetween(0, CANVAS_HEIGHT)
-          )
-        );
+        entities.push(new Entity(
+          TYPE_ROCK,
+          randBetween(0, CANVAS_WIDTH),
+          randBetween(0, CANVAS_HEIGHT)
+        ));
       }
       // 生成布
       for (let i = 0; i < pNum; i++){
-        entities.push(
-          new Entity(
-            TYPE_PAPER,
-            randBetween(0, CANVAS_WIDTH),
-            randBetween(0, CANVAS_HEIGHT)
-          )
-        );
+        entities.push(new Entity(
+          TYPE_PAPER,
+          randBetween(0, CANVAS_WIDTH),
+          randBetween(0, CANVAS_HEIGHT)
+        ));
       }
     }
 
