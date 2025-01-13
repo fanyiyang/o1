@@ -288,8 +288,8 @@
         // 逃跑 or 追逐
         if (target.type === predatorType) {
           // 逃跑 => 反向 * 0.8 * currentSpeed
-          vx = -ux * (0.8 * currentSpeed);
-          vy = -uy * (0.8 * currentSpeed);
+          vx = -ux * (0.6 * currentSpeed);
+          vy = -uy * (0.6 * currentSpeed);
         } else if (target.type === preyType) {
           // 追逐 => 同向 * currentSpeed
           vx =  ux * currentSpeed;
