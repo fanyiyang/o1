@@ -2,7 +2,8 @@
 <html lang="zh">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#2b2118" />
   <title>🧀 奶酪大盗 Cheese Thief</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -94,6 +95,7 @@
       <table id="reveal-table" class="reveal"></table>
       <button id="btn-replay" class="btn primary host-only">再来一局 🔄</button>
       <p class="hint host-only">（房主开始下一局，身份重新分配）</p>
+      <p class="hint client-only">等待房主开始下一局…</p>
     </section>
   </div>
 
@@ -128,6 +130,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script type="module" src="js/app.js?v=7"></script>
+  <script type="module" src="js/app.js?v=8"></script>
 </body>
 </html>

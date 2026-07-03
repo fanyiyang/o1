@@ -18,8 +18,8 @@ import {
   roomCodeFor,
   traitorCount,
   cowakersOfThief,
-} from './game.js?v=7';
-import { createHost, createClient } from './net.js?v=7';
+} from './game.js?v=8';
+import { createHost, createClient } from './net.js?v=8';
 
 const MIN_PLAYERS = 4;
 const MAX_PLAYERS = 8;
@@ -38,6 +38,7 @@ const G = {
   myRole: null,
   myDice: null, // [a, b]
   myVote: null,
+  voteSent: false, // local: my vote has been confirmed & sent
   peekEnabled: true, // toggle set by host in the lobby
   phase: 'lobby', // lobby | role | night | day | voting | result (host gates joins on this)
   roomCode: null, // client: code we joined (kept for auto-reconnect)
@@ -52,6 +53,7 @@ const G = {
   wakeSubmitted: false, // local: have I submitted my wake choice
   votes: {}, // voterId -> targetId
   voteResolved: false, // host: guard so late/duplicate votes can't re-resolve
+  peeks: {}, // host: peekerId -> {target, name, die} (kept so a resume can't re-peek)
   // night state:
   currentNight: 0,
   cheeseHolder: null,
@@ -193,16 +195,29 @@ $('btn-create').onclick = () => {
   if (name) startHosting(name);
 };
 
+// forgive sloppy code entry: lowercase, stray spaces/dashes, missing CHS- prefix
+function normalizeCode(raw) {
+  let s = String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (s.startsWith('CHS')) s = s.slice(3);
+  return s ? 'CHS-' + s : '';
+}
+
 $('btn-join').onclick = () => {
   unlockAudio();
   const name = readName();
   if (!name) return;
-  const code = $('code-input').value.trim().toUpperCase();
+  const code = normalizeCode($('code-input').value);
   if (!code) return homeMsg('请输入房间号');
   G.everConnected = false; // manual join: a bad code should fail fast, not auto-retry
   reconnectTries = 0;
   joinRoom(code, name);
 };
+
+// Enter submits: the code field joins; the name field creates (or joins if a code is typed)
+$('code-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btn-join').click(); });
+$('name-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') ($('code-input').value.trim() ? $('btn-join') : $('btn-create')).click();
+});
 
 // ---------- HOST ----------
 function startHosting(name) {
@@ -304,7 +319,7 @@ function purgePlayer(peerId) {
   if (G.players.length < MIN_PLAYERS) return abortRound('人数不足（少于 4 人），本局作废');
   if (G.phase === 'role') updateChooseGate();
   else if (G.phase === 'voting') {
-    $('vote-status').textContent = `已投票 ${Object.keys(G.votes).length}/${G.players.length}`;
+    broadcastVoteProgress();
     if (!G.voteResolved && Object.keys(G.votes).length >= G.players.length) resolveVotes();
   }
 }
@@ -364,6 +379,7 @@ function sendResume(peerId) {
     wakeSubmitted: !!(G.wakeNights[peerId] && G.wakeNights[peerId].length),
     wakeNightsMine: G.wakeNights[peerId] || null,
     wake: wakeInfoFor(peerId),
+    myPeek: G.peeks[peerId] || null, // what they already peeked (so they can't re-peek)
     voted: !!G.votes[peerId],
     traitorPrompt: tv.traitorPrompt,
     traitorInfo: tv.traitorInfo,
@@ -396,6 +412,9 @@ function hostHandle(peerId, msg) {
     if (!G.players.some((p) => p.id === peerId)) G.players.push({ id: peerId, name: msg.name });
     G.net.broadcast({ type: 'players', list: G.players });
     G.net.sendTo(peerId, { type: 'setting', peek: G.peekEnabled });
+    // land them on the lobby screen even if their UI is stuck mid-game
+    // (e.g. the host refreshed mid-round and this is the fresh room)
+    G.net.sendTo(peerId, { type: 'lobby' });
     renderLobby();
   } else if (msg.type === 'wake-choice') {
     recordWakeChoice(peerId, msg.nights);
@@ -429,6 +448,8 @@ function startGame() {
   G.wakeNights = {};
   G.votes = {};
   G.voteResolved = false;
+  G.voteSent = false;
+  G.peeks = {};
   clearNightTimers();
   stopCountdown();
   G.currentNight = 0;
@@ -468,7 +489,13 @@ function setPhase(phase) {
 
 // host learns each player's chosen wake schedule before the night can begin
 function recordWakeChoice(id, nights) {
-  G.wakeNights[id] = nights;
+  if (G.phase !== 'role') return; // late/stray message (round aborted or already started)
+  const allowed = distinctNights(G.dice[id] || []);
+  const uniq = [...new Set(nights || [])].sort((a, b) => a - b);
+  // thief wakes every die night; a mouse picks exactly one of its die nights
+  const need = G.roles[id] === ROLES.THIEF ? allowed.length : 1;
+  if (uniq.length !== need || !uniq.every((n) => allowed.includes(n))) return;
+  G.wakeNights[id] = uniq;
   updateChooseGate();
 }
 
@@ -509,6 +536,7 @@ $('btn-to-vote').onclick = () => {
   G.votes = {};
   G.voteResolved = false;
   setPhase('voting');
+  broadcastVoteProgress(); // everyone starts from 0/n
 };
 $('btn-force-resolve').onclick = () => resolveVotes();
 $('btn-replay').onclick = () => startGame();
@@ -614,12 +642,8 @@ function applyTheft(by) {
   if (!G.myWake) return;
   G.myWake.cheeseTakenBy = by;
   G.myWake.cheeseGone = true;
-  if (by.id === G.myId) {
-    G.myWake.action = 'steal'; // show "you took it"
-    logOnce('took', '🧀 你拿走了奶酪！');
-  } else {
-    logOnce('saw-theft-' + G.myWake.night, `👀 第 ${G.myWake.night} 晚你看见 ${by.name} 拿走了奶酪！`);
-  }
+  if (by.id === G.myId) G.myWake.action = 'steal'; // show "you took it"
+  logTheft(by, G.myWake.night);
   playSteal();
   renderTable();
   renderNight();
@@ -678,7 +702,7 @@ function startTraitorPhase() {
 }
 
 function recordTraitorPick(peerId, ids) {
-  if (G.traitorDone) return;
+  if (G.phase !== 'traitor' || G.traitorDone) return; // late pick can't resurrect an aborted round
   if (peerId !== thiefIdOf()) return; // only the thief picks
   const valid = (ids || []).filter((id) => (G.traitorCandidates || []).includes(id));
   if (valid.length !== G.traitorNeed) return;
@@ -689,6 +713,8 @@ function finishTraitors(ids) {
   if (G.traitorDone) return;
   G.traitorDone = true;
   clearNightTimers();
+  // a candidate may have been purged while the thief was choosing — drop ghosts
+  ids = (ids || []).filter((id) => G.players.some((p) => p.id === id));
   G.traitors = ids;
   const n = G.players.length;
   const knowsThief = n !== 7; // 7p: traitors know each other but not the thief
@@ -717,6 +743,7 @@ function applyTraitorInfo(info) {
 }
 
 function recordNightAction(peerId, msg) {
+  if (G.phase !== 'night' || G.nightIntro) return; // late/stray action after the phase moved on
   if (msg.kind === 'steal') {
     // only the thief, on one of its wake nights, before the cheese is taken
     if (
@@ -730,12 +757,18 @@ function recordNightAction(peerId, msg) {
   }
   if (msg.kind !== 'peek') return;
   if (!G.peekEnabled) return;
+  // peeking is only for THE lone waker of the current night, once per round
+  const wakers = wakersAt(G.wakeNights, G.currentNight);
+  if (wakers.length !== 1 || wakers[0] !== peerId) return;
+  if (G.peeks[peerId]) return; // already peeked (e.g. re-sent after a reconnect)
   const target = G.players.find((p) => p.id === msg.target);
   if (!target || msg.target === peerId) return;
   const pair = G.dice[msg.target];
+  if (!pair || !pair.length) return;
   const die = pair[Math.floor(Math.random() * pair.length)]; // reveal ONE random die
+  G.peeks[peerId] = { target: msg.target, name: target.name, die }; // kept for resume
   if (peerId === G.myId) {
-    G.myPeek = { target: msg.target, name: target.name, die };
+    G.myPeek = G.peeks[peerId];
     renderTable();
     renderNight();
   } else {
@@ -838,6 +871,7 @@ function clientHandle(msg) {
       G.wakeSubmitted = !!msg.wakeSubmitted;
       G.wakeNights = {};
       if (msg.wakeNightsMine) G.wakeNights[G.myId] = msg.wakeNightsMine;
+      G.myPeek = msg.myPeek || null; // restore a peek made before the drop
       G.myTraitorPrompt = msg.traitorPrompt || null;
       G.myTraitorInfo = msg.traitorInfo || null;
       G.myAllies = msg.allies || null;
@@ -865,6 +899,7 @@ function clientHandle(msg) {
       else if (ph === 'voting') {
         renderVote();
         if (msg.voted) {
+          G.voteSent = true;
           [...$('vote-options').children].forEach((c) => (c.disabled = true));
           $('vote-status').textContent = '你已投票，等待其他人…';
         }
@@ -876,6 +911,27 @@ function clientHandle(msg) {
     case 'players':
       G.players = msg.list;
       renderLobby();
+      break;
+    case 'lobby':
+      // seated as a FRESH player in a (possibly restarted) lobby — drop stale round state
+      G.phase = 'lobby';
+      G.myRole = null;
+      G.myDice = null;
+      G.myWake = null;
+      G.myPeek = null;
+      G.myVote = null;
+      G.voteSent = false;
+      G.wakeSubmitted = false;
+      G.currentNight = 0;
+      G.nightIntro = false;
+      G.myTraitorPrompt = null;
+      G.myTraitorInfo = null;
+      G.myAllies = null;
+      stopCountdown();
+      applyNightMute();
+      updateMediaButtons();
+      show('screen-lobby');
+      lobbyMsg('已连接，等待房主开始…');
       break;
     case 'setting':
       G.peekEnabled = msg.peek;
@@ -891,6 +947,7 @@ function clientHandle(msg) {
       G.myWake = null;
       G.myPeek = null;
       G.myVote = null;
+      G.voteSent = false;
       G.nightActed = false;
       G.peekSent = false;
       G.thiefHeld = false;
@@ -949,6 +1006,10 @@ function clientHandle(msg) {
     case 'traitor-allies':
       G.myAllies = msg.names;
       break;
+    case 'vote-progress':
+      if (G.phase === 'voting')
+        $('vote-status').textContent = `已投票 ${msg.done}/${msg.total}` + (G.voteSent ? ' · 等待其他人…' : '');
+      break;
     case 'result':
       G.players = msg.reveal.map((r) => ({ id: r.id, name: r.name }));
       renderResult(msg);
@@ -956,6 +1017,8 @@ function clientHandle(msg) {
       break;
     case 'aborted':
       G.phase = 'lobby';
+      G.myWake = null;
+      G.nightIntro = false;
       stopCountdown();
       show('screen-lobby');
       lobbyMsg(msg.text || '本局作废，等待房主重开');
@@ -1007,12 +1070,20 @@ function renderPeekState() {
   if (btn) btn.textContent = G.peekEnabled ? '开' : '关';
 }
 
+// shared label for player lists: 👑 host (always players[0]) + your seat + drop status
+function playerLabel(p, i) {
+  return (
+    (i === 0 ? '👑 ' : '') + p.name + (p.id === G.myId ? '（你）' : '') + (p.disconnected ? ' · 📵 掉线重连中…' : '')
+  );
+}
+
 function renderLobby() {
   const ul = $('lobby-players');
   ul.innerHTML = '';
-  G.players.forEach((p) => {
+  G.players.forEach((p, i) => {
     const li = document.createElement('li');
-    li.textContent = p.name + (p.id === G.myId ? '（你）' : '');
+    li.textContent = playerLabel(p, i);
+    if (p.disconnected) li.className = 'dc';
     ul.appendChild(li);
   });
   if (G.isHost) {
@@ -1189,10 +1260,7 @@ function renderNight() {
     else if (G.myWake.cheeseGone && (!tb || tb.id === G.myId) && G.myRole !== ROLES.THIEF)
       line += ' ｜ 🧀 中间的奶酪已经不见了';
     cap.textContent = line;
-    // personal log
-    logOnce('wake' + n, `🌙 第${n}晚 你睁眼${others.length ? '，同晚：' + others.join('、') : '（只有你）'}`);
-    if (tb && tb.id === G.myId) logOnce('mysteal', `🧀 第${n}晚 你拿走了奶酪`);
-    else if (tb) logOnce('sawtheft', `🧀 第${n}晚 你看到 ${tb.name} 拿走了奶酪`);
+    logTheft(tb, n); // logWake already covered the wake itself
   } else {
     const mine = G.wakeNights[G.myId] || [];
     const upcoming = mine.filter((n) => n > G.currentNight);
@@ -1362,9 +1430,10 @@ function renderDay() {
   logOnce('dawn', '☀️ 天亮了——奶酪不见了！！！');
   const ul = $('day-players');
   ul.innerHTML = '';
-  G.players.forEach((p) => {
+  G.players.forEach((p, i) => {
     const li = document.createElement('li');
-    li.textContent = p.name + (p.id === G.myId ? '（你）' : '');
+    li.textContent = playerLabel(p, i);
+    if (p.disconnected) li.className = 'dc';
     ul.appendChild(li);
   });
   const note = $('day-note');
@@ -1387,6 +1456,7 @@ function renderDay() {
 
 function renderVote() {
   G.myVote = null;
+  G.voteSent = false;
   const box = $('vote-options');
   box.innerHTML = '';
   G.players
@@ -1394,7 +1464,7 @@ function renderVote() {
     .forEach((p) => {
       const b = document.createElement('button');
       b.className = 'vote-opt';
-      b.textContent = p.name;
+      b.textContent = p.name + (p.disconnected ? '（掉线中）' : '');
       b.onclick = () => {
         G.myVote = p.id;
         [...box.children].forEach((c) => c.classList.toggle('selected', c === b));
@@ -1408,6 +1478,7 @@ function renderVote() {
 
 $('btn-confirm-vote').onclick = () => {
   if (!G.myVote) return;
+  G.voteSent = true;
   playVote();
   if (G.isHost) recordVote(G.myId, G.myVote);
   else G.net.send({ type: 'vote', target: G.myVote });
@@ -1417,10 +1488,22 @@ $('btn-confirm-vote').onclick = () => {
 };
 
 function recordVote(voterId, target) {
-  if (G.voteResolved) return; // ignore late/duplicate votes after resolution
+  if (G.phase !== 'voting' || G.voteResolved) return; // ignore late/duplicate votes
+  // both the voter and the target must be seated players; no self-votes
+  if (!G.players.some((p) => p.id === voterId)) return;
+  if (voterId === target || !G.players.some((p) => p.id === target)) return;
   G.votes[voterId] = target;
-  if (G.isHost) $('vote-status').textContent = `已投票 ${Object.keys(G.votes).length}/${G.players.length}`;
+  broadcastVoteProgress();
   if (Object.keys(G.votes).length >= G.players.length) resolveVotes();
+}
+
+// everyone (not just the host) sees how many votes are in
+function broadcastVoteProgress() {
+  const done = Object.keys(G.votes).length;
+  const total = G.players.length;
+  G.net.broadcast({ type: 'vote-progress', done, total });
+  if (G.phase === 'voting')
+    $('vote-status').textContent = `已投票 ${done}/${total}` + (G.voteSent ? ' · 等待其他人…' : '');
 }
 
 function resolveVotes() {
@@ -1454,7 +1537,9 @@ function renderResult(r) {
     const p = r.reveal.find((x) => x.id === id);
     return p ? `${p.name}（${roleLabel(p)}）` : '?';
   });
-  const elimText = elimNames.length ? `出局：${elimNames.join('、')}` : '无人出局';
+  const elimText =
+    (elimNames.length > 1 ? '⚖️ 平票，全部出局 · ' : '') +
+    (elimNames.length ? `出局：${elimNames.join('、')}` : '无人出局');
   logOnce('result', `🏁 ${winText} ｜ ${elimText}`);
   $('result-banner').innerHTML = `<div class="winner ${r.winner}">${winText}</div><div class="elim">${elimText}</div>`;
 
@@ -1542,6 +1627,15 @@ try {
   if (_nick) $('name-input').value = _nick;
 } catch (e) {}
 
+// mid-game, closing/refreshing the tab is destructive (host: kills the round for
+// everyone; client: a needless drop) — ask for confirmation first
+window.addEventListener('beforeunload', (e) => {
+  if (G.net && ['role', 'night', 'traitor', 'day', 'voting'].includes(G.phase)) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
+
 // ---------- personal log (collapsible side panel) ----------
 function logOnce(key, text) {
   if (loggedKeys.has(key)) return;
@@ -1554,10 +1648,18 @@ function resetLog() {
   loggedKeys = new Set();
   renderLog();
 }
-// On each night you open your eyes, record whether the cheese was still there.
+// On each night you open your eyes: one line with co-wakers + whether the cheese was there.
 function logWake(wake) {
   if (!wake) return;
-  logOnce('wake-' + wake.night, `🌙 第 ${wake.night} 晚你睁眼了——奶酪${wake.cheeseGone ? '已经不见了！' : '还在桌上 🧀'}`);
+  const others = (wake.coWakers || []).filter((w) => w.id !== G.myId).map((w) => w.name);
+  const who = others.length ? `（同晚：${others.join('、')}）` : '（只有你）';
+  logOnce('wake-' + wake.night, `🌙 第 ${wake.night} 晚你睁眼${who}——奶酪${wake.cheeseGone ? '已经不见了！' : '还在桌上 🧀'}`);
+}
+// The theft, seen from my seat (same keys everywhere so replays/resumes can't duplicate it).
+function logTheft(by, night) {
+  if (!by) return;
+  if (by.id === G.myId) logOnce('took', '🧀 你拿走了奶酪！');
+  else logOnce('saw-theft-' + night, `👀 第 ${night} 晚你看见 ${by.name} 拿走了奶酪！`);
 }
 function renderLog() {
   const list = $('log-list');

@@ -13,6 +13,7 @@
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+button { touch-action: manipulation; user-select: none; -webkit-user-select: none; } /* no dbl-tap zoom on mobile */
 
 body {
   margin: 0;
@@ -156,6 +157,7 @@ body {
   font-weight: 600;
   box-shadow: inset 0 0 0 1px #eadbbd;
 }
+.player-list li.dc { opacity: .55; font-style: italic; } /* dropped, holding their seat */
 
 /* role card */
 #role-card { margin: 8px 0 4px; }
@@ -353,9 +355,10 @@ body {
 .reveal tr { transform-origin: top; animation: rowFlip .35s ease backwards; }
 @keyframes rowFlip { from { transform: rotateX(-90deg); opacity: 0; } to { transform: rotateX(0); opacity: 1; } }
 
-/* host-only controls hidden for non-host players */
+/* host-only controls hidden for non-host players (and vice versa) */
 .host-only { display: none; }
 body.is-host .host-only { display: block; }
+body.is-host .client-only { display: none; }
 
 /* rules: a small always-available button + floating overlay */
 .reconnect-banner {
@@ -456,7 +459,7 @@ body.is-host .host-only { display: block; }
 
 /* ---------- voice mic toggle ---------- */
 .mic-btn {
-  position: fixed; right: 14px; bottom: 14px; z-index: 60;
+  position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 60;
   width: 46px; height: 46px; border-radius: 50%; border: none;
   background: #ffffff26; color: #fff; font-size: 20px; cursor: pointer;
   box-shadow: 0 2px 10px rgba(0,0,0,.4);
@@ -467,7 +470,7 @@ body.is-host .host-only { display: block; }
 
 /* ---------- collapsible side log ---------- */
 .log-toggle {
-  position: fixed; right: 14px; bottom: 68px; z-index: 60;
+  position: fixed; right: 14px; bottom: calc(68px + env(safe-area-inset-bottom, 0px)); z-index: 60;
   width: 38px; height: 38px; border-radius: 50%;
   background: #0000004d; color: #fff; border: none; font-size: 16px; cursor: pointer;
   box-shadow: 0 2px 8px rgba(0,0,0,.3);
@@ -475,7 +478,7 @@ body.is-host .host-only { display: block; }
 .log-toggle:active { transform: scale(.94); }
 /* small, non-intrusive floating popover (bottom-right, above the buttons) */
 .log-panel {
-  position: fixed; right: 14px; bottom: 112px; z-index: 120;
+  position: fixed; right: 14px; bottom: calc(112px + env(safe-area-inset-bottom, 0px)); z-index: 120;
   width: min(252px, 76vw); max-height: 48vh;
   background: var(--panel); color: var(--ink);
   border-radius: 14px; box-shadow: 0 12px 30px rgba(0,0,0,.5);
@@ -492,7 +495,7 @@ body.is-host .host-only { display: block; }
 
 /* ---------- camera toggle + video tiles ---------- */
 .cam-btn {
-  position: fixed; right: 68px; bottom: 14px; z-index: 60;
+  position: fixed; right: 68px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 60;
   width: 46px; height: 46px; border-radius: 50%; border: none;
   background: #ffffff26; color: #fff; font-size: 19px; cursor: pointer;
   box-shadow: 0 2px 10px rgba(0,0,0,.4);
@@ -502,7 +505,7 @@ body.is-host .host-only { display: block; }
 .cam-btn:active { transform: scale(.94); }
 
 .video-wrap {
-  position: fixed; left: 50%; bottom: 66px; transform: translateX(-50%);
+  position: fixed; left: 50%; bottom: calc(66px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
   z-index: 55; display: none; flex-direction: column; align-items: center; gap: 6px;
   max-width: 94vw; pointer-events: none;
 }
