@@ -39,6 +39,7 @@ body {
   font-weight: 800;
   color: var(--cheese);
   margin-bottom: 16px;
+  padding: 0 78px; /* clear the fixed lang (left) + rules (right) buttons */
   text-shadow: 0 2px 0 rgba(0,0,0,.3);
 }
 
@@ -378,6 +379,16 @@ body.is-host .client-only { display: none; }
 }
 .rules-btn:active { transform: scale(.96); }
 .rules-btn:hover { filter: brightness(1.06); }
+/* language toggle (中文/EN) mirrors the rules button on the left */
+.lang-btn {
+  position: fixed; top: 12px; left: 12px; z-index: 50;
+  background: #0000004d; color: #fff;
+  border: none; border-radius: 20px;
+  padding: 7px 13px; font-size: 13px; font-weight: 700; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,.35);
+}
+.lang-btn:active { transform: scale(.96); }
+.lang-btn:hover { filter: brightness(1.2); }
 .rules-overlay {
   position: fixed; inset: 0; z-index: 100;
   background: #000a; display: none;

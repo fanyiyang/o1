@@ -5,46 +5,56 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#2b2118" />
   <title>🧀 奶酪大盗 Cheese Thief</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta name="description" content="奶酪大盗 Cheese Thief — 4–8 人在线社交推理小游戏。免下载、免注册，发个链接就能和朋友开玩。A 4–8 player online social deduction game." />
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="assets/icon-192.png" />
+  <link rel="manifest" href="manifest.json" />
+  <!-- social share cards (WeChat / Discord / Twitter link previews) -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="🧀 奶酪大盗 Cheese Thief — 谁半夜偷走了奶酪？" />
+  <meta property="og:description" content="4–8 人在线社交推理小游戏。免下载、免注册，发个链接就能和朋友开玩。" />
+  <meta property="og:url" content="https://fanyiyang.github.io/cheese-thief/" />
+  <meta property="og:image" content="https://fanyiyang.github.io/cheese-thief/assets/og.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="🧀 奶酪大盗 Cheese Thief — 谁半夜偷走了奶酪？" />
+  <meta name="twitter:description" content="4–8 人在线社交推理小游戏。免下载、免注册，发个链接就能开玩。" />
+  <meta name="twitter:image" content="https://fanyiyang.github.io/cheese-thief/assets/og.png" />
+  <link rel="stylesheet" href="style.css?v=10" />
 </head>
 <body>
   <div id="app">
-    <header class="app-header">🧀 奶酪大盗</header>
+    <header class="app-header" data-i18n="appTitle">🧀 奶酪大盗</header>
 
     <!-- HOME -->
     <section id="screen-home" class="screen active">
-      <input id="name-input" class="text-input" placeholder="你的昵称" maxlength="12" autocomplete="off" />
-      <button id="btn-create" class="btn primary">创建房间</button>
-      <div class="divider">或</div>
-      <input id="code-input" class="text-input" placeholder="房间号（如 CHS-7K2）" autocomplete="off" />
-      <button id="btn-join" class="btn">加入房间</button>
+      <input id="name-input" class="text-input" data-i18n-ph="nickPh" placeholder="你的昵称" maxlength="12" autocomplete="off" />
+      <button id="btn-create" class="btn primary" data-i18n="createRoom">创建房间</button>
+      <div class="divider" data-i18n="or">或</div>
+      <input id="code-input" class="text-input" data-i18n-ph="codePh" placeholder="房间号（如 CHS-7K2）" autocomplete="off" />
+      <button id="btn-join" class="btn" data-i18n="joinRoomBtn">加入房间</button>
       <p id="home-msg" class="msg"></p>
-      <p class="hint">4–8 人 · 需自行开语音沟通</p>
+      <p class="hint" data-i18n="homeHint">4–8 人 · 可用内置语音或自行开语音沟通</p>
     </section>
 
     <!-- LOBBY -->
     <section id="screen-lobby" class="screen">
-      <p class="phase-label">房间号</p>
+      <p class="phase-label" data-i18n="roomCodeLabel">房间号</p>
       <div id="room-code" class="code"></div>
-      <button id="btn-copy-code" class="btn ghost">📋 复制房间号链接</button>
-      <p class="hint host-only">把房间号（或链接）发给朋友，4–8 人即可开始</p>
+      <button id="btn-copy-code" class="btn ghost" data-i18n="copyLink">📋 复制房间号链接</button>
+      <p class="hint host-only" data-i18n="lobbyShareHint">把房间号（或链接）发给朋友，4–8 人即可开始</p>
       <ul id="lobby-players" class="player-list"></ul>
-      <div id="peek-setting" class="setting-row host-only">
-        <span>偷看规则</span>
-        <button id="btn-peek-toggle" class="btn ghost toggle">开</button>
-      </div>
       <p id="peek-state" class="hint"></p>
-      <button id="btn-start" class="btn primary host-only" disabled>开始游戏</button>
+      <button id="btn-start" class="btn primary host-only" data-i18n="startGameBtn" disabled>开始游戏</button>
       <p id="lobby-msg" class="msg"></p>
     </section>
 
     <!-- ROLE + CHOOSE WAKE NIGHT -->
     <section id="screen-role" class="screen">
-      <p class="phase-label">你的身份</p>
+      <p class="phase-label" data-i18n="yourRole">你的身份</p>
       <div id="role-card"></div>
       <div id="wake-choice" class="wake-choice"></div>
-      <p class="hint">记住身份，别让别人看到你的屏幕</p>
-      <button id="btn-to-night" class="btn primary host-only" disabled>进入夜晚 🌙</button>
+      <p class="hint" data-i18n="keepSecret">记住身份，别让别人看到你的屏幕</p>
+      <button id="btn-to-night" class="btn primary host-only" data-i18n="toNight" disabled>进入夜晚 🌙</button>
       <p id="role-wait" class="msg"></p>
     </section>
 
@@ -67,35 +77,35 @@
 
     <!-- TRAITOR (5-8 players: thief recruits accomplices after night 6) -->
     <section id="screen-traitor" class="screen night">
-      <p class="phase-label">🌙 深夜</p>
+      <p class="phase-label" data-i18n="deepNight">🌙 深夜</p>
       <div id="traitor-body"></div>
     </section>
 
     <!-- DAY -->
     <section id="screen-day" class="screen">
-      <p class="phase-label">☀️ 白天 · 讨论</p>
+      <p class="phase-label" data-i18n="dayLabel">☀️ 白天 · 讨论</p>
       <ul id="day-players" class="player-list"></ul>
       <div id="day-note"></div>
-      <p id="day-hint" class="hint">开语音讨论后投票。</p>
-      <button id="btn-to-vote" class="btn primary host-only">开始投票 🗳️</button>
+      <p id="day-hint" class="hint" data-i18n="dayHintDefault">开语音讨论后投票。</p>
+      <button id="btn-to-vote" class="btn primary host-only" data-i18n="startVote">开始投票 🗳️</button>
     </section>
 
     <!-- VOTE -->
     <section id="screen-vote" class="screen">
-      <p class="phase-label">🗳️ 谁是奶酪大盗？</p>
+      <p class="phase-label" data-i18n="whoIsThief">🗳️ 谁是奶酪大盗？</p>
       <div id="vote-options" class="vote-options"></div>
-      <button id="btn-confirm-vote" class="btn primary" disabled>确认投票</button>
+      <button id="btn-confirm-vote" class="btn primary" data-i18n="confirmVote" disabled>确认投票</button>
       <p id="vote-status" class="msg"></p>
-      <button id="btn-force-resolve" class="btn ghost host-only">结束投票并结算</button>
+      <button id="btn-force-resolve" class="btn ghost host-only" data-i18n="forceResolve">结束投票并结算</button>
     </section>
 
     <!-- RESULT -->
     <section id="screen-result" class="screen">
       <div id="result-banner"></div>
       <table id="reveal-table" class="reveal"></table>
-      <button id="btn-replay" class="btn primary host-only">再来一局 🔄</button>
-      <p class="hint host-only">（房主开始下一局，身份重新分配）</p>
-      <p class="hint client-only">等待房主开始下一局…</p>
+      <button id="btn-replay" class="btn primary host-only" data-i18n="replay">再来一局 🔄</button>
+      <p class="hint host-only" data-i18n="hostNextHint">（房主开始下一局，身份重新分配）</p>
+      <p class="hint client-only" data-i18n="clientNextHint">等待房主开始下一局…</p>
     </section>
   </div>
 
@@ -105,7 +115,8 @@
     <div id="sky-label" class="sky-label"></div>
   </div>
 
-  <button id="rules-btn" class="rules-btn" title="查看规则">❓ 规则</button>
+  <button id="lang-btn" class="lang-btn" title="中文 / English">🌐 EN</button>
+  <button id="rules-btn" class="rules-btn" data-i18n="rulesBtn" data-i18n-title="rulesTitle_" title="查看规则">❓ 规则</button>
   <div id="rules-overlay" class="rules-overlay">
     <div id="rules-card" class="rules-card"></div>
   </div>
@@ -115,21 +126,21 @@
   <button id="cam-btn" class="cam-btn" title="摄像头开关">📷</button>
   <div id="video-wrap" class="video-wrap">
     <div class="vid-size-ctrl">
-      <button id="vid-smaller" class="vid-sz-btn" title="画面变小">－</button>
-      <span class="vid-sz-label">画面大小</span>
-      <button id="vid-bigger" class="vid-sz-btn" title="画面变大">＋</button>
+      <button id="vid-smaller" class="vid-sz-btn" data-i18n-title="vidSmaller_" title="画面变小">－</button>
+      <span class="vid-sz-label" data-i18n="vidSize">画面大小</span>
+      <button id="vid-bigger" class="vid-sz-btn" data-i18n-title="vidBigger_" title="画面变大">＋</button>
     </div>
     <div id="video-grid" class="video-grid"></div>
   </div>
 
   <!-- collapsible side log of what happened to you -->
-  <button id="log-toggle" class="log-toggle" title="我的记录">📜</button>
+  <button id="log-toggle" class="log-toggle" data-i18n-title="myLogTitle_" title="我的记录">📜</button>
   <div id="log-panel" class="log-panel">
-    <div class="log-head"><span>📜 我的记录</span><button id="log-close" class="log-x">×</button></div>
+    <div class="log-head"><span data-i18n="myLog">📜 我的记录</span><button id="log-close" class="log-x">×</button></div>
     <div id="log-list" class="log-list"></div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script type="module" src="js/app.js?v=8"></script>
+  <script type="module" src="js/app.js?v=10"></script>
 </body>
 </html>

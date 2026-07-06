@@ -2,8 +2,27 @@
 // PeerJS is loaded globally from a CDN <script> in index.html.
 /* global Peer */
 
-// PeerJS's free public broker handles signaling; the data flows peer-to-peer.
-const PEER_OPTS = { debug: 1 };
+// Signaling defaults to PeerJS's free public broker; the data flows peer-to-peer.
+// A self-hosted PeerServer can be used as a fallback via ?server=host[:port][/path]
+// (the invite link copies the param along, so every player lands on the same one).
+function peerOpts() {
+  const opts = { debug: 1 };
+  try {
+    const s = new URLSearchParams(location.search).get('server');
+    if (s) {
+      const m = String(s).match(/^([^:/]+)(?::(\d+))?(\/.*)?$/);
+      if (m) {
+        opts.host = m[1];
+        opts.port = m[2] ? +m[2] : 443;
+        opts.path = m[3] || '/';
+        opts.secure = !/^(localhost|127\.)/.test(m[1]); // https except for local dev
+      }
+    }
+  } catch (e) {
+    /* bad ?server= → fall back to the public broker */
+  }
+  return opts;
+}
 
 // Host: peer id IS the room code, so clients can connect knowing only the code.
 // Callbacks: onReady(code), onConnect(peerId), onData(peerId, msg),
@@ -16,7 +35,7 @@ export function createHost({
   onDisconnect,
   onError,
 }) {
-  const peer = new Peer(roomCode, PEER_OPTS);
+  const peer = new Peer(roomCode, peerOpts());
   const conns = new Map(); // peerId -> DataConnection
 
   peer.on('open', (id) => onReady && onReady(id));
@@ -63,7 +82,7 @@ export function createClient({ roomCode, peerId, onConnected, onData, onDisconne
   let idAttempt = 0;
 
   function open() {
-    peer = peerId ? new Peer(peerId, PEER_OPTS) : new Peer(PEER_OPTS);
+    peer = peerId ? new Peer(peerId, peerOpts()) : new Peer(peerOpts());
     peer.on('open', (myId) => {
       if (destroyed) return;
       conn = peer.connect(roomCode, { reliable: true });

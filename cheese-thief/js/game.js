@@ -66,6 +66,16 @@ export function resolveWinner(eliminatedIds, roles) {
   return thiefCaught ? 'sleepyheads' : 'thief';
 }
 
+// Official rules key setup on player count:
+//   5-8p base game — 1 die each; a lone-waking sleepyhead MAY peek a cup.
+//   4p variant     — 2 dice each (pick a wake night); peeking is FORBIDDEN.
+export function diceCountFor(n) {
+  return n === 4 ? 2 : 1;
+}
+export function peekAllowedFor(n) {
+  return n >= 5;
+}
+
 // Number of traitors for a given player count (4-player variant has none).
 export function traitorCount(n) {
   if (n === 5 || n === 6) return 1;

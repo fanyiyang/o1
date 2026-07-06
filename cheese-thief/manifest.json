@@ -1,0 +1,14 @@
+{
+  "name": "奶酪大盗 Cheese Thief",
+  "short_name": "奶酪大盗",
+  "description": "4–8 人在线社交推理小游戏 · A 4–8 player online social deduction game",
+  "start_url": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#2b2118",
+  "theme_color": "#2b2118",
+  "icons": [
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
