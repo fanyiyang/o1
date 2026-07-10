@@ -1,24 +1,76 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Game Hub</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>">
     <link rel="stylesheet" href="styles.css">
 </head>
-<body>
-    <h1>Welcome to the Game Hub</h1>
-    <ul>
-        <li><a href="RPS.html">Rock-Paper-Scissor</a></li>
-        <li><a href="tic-tac-toe.html">Tic-Tac-Toe</a></li>
-        <li><a href="gomoku.html">Gomoku (五子棋)</a></li>
-        <li><a href="snake.html">Snake</a></li>
-        <li><a href="tetris.html">Tetris</a></li>
-        <li><a href="pong.html">Pong</a></li>
-        <li><a href="minesweeper.html">Minesweeper</a></li>
-        <li><a href="chess.html">Chess</a></li>
-        <li><a href="matrix_triview.html">Matrix Dot Cloud (三视角镂空字)</a></li>
-        <li><a href="rl_droid_omega.html">DROID//OMEGA — Procedural RL Gauntlet</a></li>
-        <li><a href="cheese-thief/index.html">奶酪大盗 Cheese Thief (多人在线)</a></li>
-    </ul>
+<body class="hub">
+    <header class="hub-header">
+        <h1>🎮 Game Hub</h1>
+        <p class="hub-tagline">一组小游戏与可视化实验，点击卡片开始</p>
+    </header>
+
+    <main class="hub-grid">
+        <a class="game-card" href="RPS.html">
+            <span class="game-icon">✂️</span>
+            <span class="game-name">剪刀石头布</span>
+            <span class="game-desc">Rock · Paper · Scissors，追逐/逃跑生态模拟</span>
+        </a>
+        <a class="game-card" href="tic-tac-toe.html">
+            <span class="game-icon">⭕</span>
+            <span class="game-name">井字棋 Tic-Tac-Toe</span>
+            <span class="game-desc">经典 3×3 井字棋对战</span>
+        </a>
+        <a class="game-card" href="gomoku.html">
+            <span class="game-icon">⚫</span>
+            <span class="game-name">五子棋 Gomoku</span>
+            <span class="game-desc">五子连珠，先连成一线者胜</span>
+        </a>
+        <a class="game-card" href="snake.html">
+            <span class="game-icon">🐍</span>
+            <span class="game-name">贪吃蛇 Snake</span>
+            <span class="game-desc">方向键控制，吃食物变长</span>
+        </a>
+        <a class="game-card" href="tetris.html">
+            <span class="game-icon">🧱</span>
+            <span class="game-name">俄罗斯方块 Tetris</span>
+            <span class="game-desc">经典落块消行</span>
+        </a>
+        <a class="game-card" href="pong.html">
+            <span class="game-icon">🏓</span>
+            <span class="game-name">Pong</span>
+            <span class="game-desc">最早的电子游戏之一，弹球对打</span>
+        </a>
+        <a class="game-card" href="minesweeper.html">
+            <span class="game-icon">💣</span>
+            <span class="game-name">扫雷 Minesweeper</span>
+            <span class="game-desc">左键翻开，右键插旗</span>
+        </a>
+        <a class="game-card" href="chess.html">
+            <span class="game-icon">♟️</span>
+            <span class="game-name">国际象棋 Chess</span>
+            <span class="game-desc">拖动棋子走棋</span>
+        </a>
+        <a class="game-card" href="matrix_triview.html">
+            <span class="game-icon">🟩</span>
+            <span class="game-name">Matrix Dot Cloud</span>
+            <span class="game-desc">三视角镂空字点云可视化</span>
+        </a>
+        <a class="game-card" href="rl_droid_omega.html">
+            <span class="game-icon">🤖</span>
+            <span class="game-name">DROID//OMEGA</span>
+            <span class="game-desc">Procedural RL Gauntlet 强化学习演示</span>
+        </a>
+        <a class="game-card" href="cheese-thief/index.html">
+            <span class="game-icon">🧀</span>
+            <span class="game-name">奶酪大盗 Cheese Thief</span>
+            <span class="game-desc">多人在线社交推理游戏</span>
+        </a>
+    </main>
+
+    <footer class="hub-footer">Have fun ·  用键盘或鼠标即可游玩</footer>
 </body>
 </html>
